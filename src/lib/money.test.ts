@@ -1,0 +1,2 @@
+import {describe,expect,it} from "vitest"; import {dollarsToCents} from "./money";
+describe("money",()=>{it("converts dollars safely",()=>{expect(dollarsToCents("12.50")).toBe(1250);expect(dollarsToCents("0.99")).toBe(99)});it("rejects malformed, negative and over-precision values",()=>{expect(()=>dollarsToCents("-1")).toThrow();expect(()=>dollarsToCents("1.999")).toThrow();expect(()=>dollarsToCents("nope")).toThrow()})});

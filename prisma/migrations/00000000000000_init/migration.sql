@@ -1,0 +1,35 @@
+-- Pre-production baseline migration.
+-- This replaces the invalid uncommitted history that referenced missing tables.
+CREATE SCHEMA IF NOT EXISTS "public";
+CREATE TYPE "public"."PublishStatus" AS ENUM ('DRAFT', 'PUBLISHED');
+CREATE TYPE "public"."OrderStatus" AS ENUM ('PENDING', 'PAID', 'FAILED', 'CANCELLED');
+CREATE TYPE "public"."PaymentStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'REFUNDED');
+CREATE TABLE "public"."Photographer" ("id" TEXT NOT NULL, "email" TEXT NOT NULL, "name" TEXT NOT NULL, "passwordHash" TEXT NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "Photographer_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "public"."Event" ("id" TEXT NOT NULL, "photographerId" TEXT NOT NULL, "title" TEXT NOT NULL, "slug" TEXT NOT NULL, "accessCode" TEXT NOT NULL, "description" TEXT, "status" "public"."PublishStatus" NOT NULL DEFAULT 'DRAFT', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "Event_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "public"."Album" ("id" TEXT NOT NULL, "eventId" TEXT NOT NULL, "photographerId" TEXT NOT NULL, "title" TEXT NOT NULL, "slug" TEXT NOT NULL, "description" TEXT, "status" "public"."PublishStatus" NOT NULL DEFAULT 'DRAFT', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "Album_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "public"."Photo" ("id" TEXT NOT NULL, "albumId" TEXT NOT NULL, "title" TEXT, "originalKey" TEXT NOT NULL, "previewKey" TEXT NOT NULL, "width" INTEGER, "height" INTEGER, "priceCents" INTEGER NOT NULL DEFAULT 1500, "metadata" JSONB, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "Photo_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "public"."Order" ("id" TEXT NOT NULL, "eventId" TEXT NOT NULL, "customerEmail" TEXT NOT NULL, "status" "public"."OrderStatus" NOT NULL DEFAULT 'PENDING', "totalCents" INTEGER NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "Order_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "public"."OrderItem" ("id" TEXT NOT NULL, "orderId" TEXT NOT NULL, "photoId" TEXT NOT NULL, "unitPriceCents" INTEGER NOT NULL, CONSTRAINT "OrderItem_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "public"."Payment" ("id" TEXT NOT NULL, "orderId" TEXT NOT NULL, "provider" TEXT NOT NULL, "providerPaymentId" TEXT, "amount" INTEGER NOT NULL, "currency" TEXT NOT NULL DEFAULT 'USD', "status" "public"."PaymentStatus" NOT NULL DEFAULT 'PENDING', "rawResponse" JSONB, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "Payment_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "public"."DownloadGrant" ("id" TEXT NOT NULL, "orderId" TEXT NOT NULL, "photoId" TEXT NOT NULL, "expiresAt" TIMESTAMP(3) NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "DownloadGrant_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "Photographer_email_key" ON "public"."Photographer"("email");
+CREATE INDEX "Photographer_createdAt_idx" ON "public"."Photographer"("createdAt");
+CREATE UNIQUE INDEX "Event_slug_key" ON "public"."Event"("slug");
+CREATE UNIQUE INDEX "Event_accessCode_key" ON "public"."Event"("accessCode");
+CREATE INDEX "Event_photographerId_status_idx" ON "public"."Event"("photographerId", "status");
+CREATE UNIQUE INDEX "Album_eventId_slug_key" ON "public"."Album"("eventId", "slug");
+CREATE INDEX "Album_eventId_status_idx" ON "public"."Album"("eventId", "status");
+CREATE INDEX "Album_photographerId_status_idx" ON "public"."Album"("photographerId", "status");
+CREATE UNIQUE INDEX "OrderItem_orderId_photoId_key" ON "public"."OrderItem"("orderId", "photoId");
+CREATE UNIQUE INDEX "Payment_orderId_key" ON "public"."Payment"("orderId");
+CREATE UNIQUE INDEX "DownloadGrant_orderId_photoId_key" ON "public"."DownloadGrant"("orderId", "photoId");
+ALTER TABLE "public"."Event" ADD CONSTRAINT "Event_photographerId_fkey" FOREIGN KEY ("photographerId") REFERENCES "public"."Photographer"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."Album" ADD CONSTRAINT "Album_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "public"."Event"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."Album" ADD CONSTRAINT "Album_photographerId_fkey" FOREIGN KEY ("photographerId") REFERENCES "public"."Photographer"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."Photo" ADD CONSTRAINT "Photo_albumId_fkey" FOREIGN KEY ("albumId") REFERENCES "public"."Album"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."Order" ADD CONSTRAINT "Order_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "public"."Event"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."OrderItem" ADD CONSTRAINT "OrderItem_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "public"."Order"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."OrderItem" ADD CONSTRAINT "OrderItem_photoId_fkey" FOREIGN KEY ("photoId") REFERENCES "public"."Photo"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."Payment" ADD CONSTRAINT "Payment_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "public"."Order"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."DownloadGrant" ADD CONSTRAINT "DownloadGrant_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "public"."Order"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."DownloadGrant" ADD CONSTRAINT "DownloadGrant_photoId_fkey" FOREIGN KEY ("photoId") REFERENCES "public"."Photo"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

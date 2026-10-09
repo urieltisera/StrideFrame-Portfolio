@@ -1,0 +1,17 @@
+ALTER TYPE "public"."OrderStatus" RENAME VALUE 'PENDING' TO 'PENDING_PAYMENT';
+ALTER TYPE "public"."OrderStatus" RENAME VALUE 'FAILED' TO 'PAYMENT_FAILED';
+ALTER TYPE "public"."OrderStatus" ADD VALUE 'REFUNDED';
+ALTER TABLE "Order" ADD COLUMN "publicOrderCode" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "Order" ADD COLUMN "photographerId" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "Order" ADD COLUMN "customerFirstName" TEXT;
+ALTER TABLE "Order" ADD COLUMN "customerLastName" TEXT;
+ALTER TABLE "Order" ADD COLUMN "currency" TEXT NOT NULL DEFAULT 'USD';
+ALTER TABLE "Order" ADD COLUMN "subtotalCents" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "Order" ADD COLUMN "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE "OrderItem" ADD COLUMN "currency" TEXT NOT NULL DEFAULT 'USD';
+ALTER TABLE "OrderItem" ADD COLUMN "originalFilename" TEXT;
+ALTER TABLE "OrderItem" ADD COLUMN "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+CREATE UNIQUE INDEX "Order_publicOrderCode_key" ON "Order"("publicOrderCode");
+CREATE INDEX "Order_photographerId_status_idx" ON "Order"("photographerId", "status");
+CREATE INDEX "Order_customerEmail_idx" ON "Order"("customerEmail");
+ALTER TABLE "Order" ADD CONSTRAINT "Order_photographerId_fkey" FOREIGN KEY ("photographerId") REFERENCES "Photographer"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

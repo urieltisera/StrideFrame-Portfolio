@@ -1,0 +1,258 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PublishStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PAYMENT_FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum PhotoStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum QRLinkStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum DownloadGrantStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum FaceIndexJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Photographer {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  events       Event[]
+  albums       Album[]
+  qrLinks      QRLink[]
+  orders       Order[]
+
+  @@index([createdAt])
+}
+
+model Event {
+  id             String        @id @default(cuid())
+  photographerId String
+  photographer   Photographer  @relation(fields: [photographerId], references: [id], onDelete: Cascade)
+  title          String
+  slug           String        @unique
+  accessCode     String        @unique
+  description    String?
+  status         PublishStatus @default(DRAFT)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  albums         Album[]
+  orders         Order[]
+  qrLinks        QRLink[]
+
+  @@index([photographerId, status])
+}
+
+model Album {
+  id             String        @id @default(cuid())
+  eventId        String
+  event          Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  photographerId String
+  photographer   Photographer  @relation(fields: [photographerId], references: [id], onDelete: Cascade)
+  title          String
+  slug           String
+  description    String?
+  status         PublishStatus @default(DRAFT)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  photos         Photo[]
+  qrLinks        QRLink[]
+
+  @@unique([eventId, slug])
+  @@index([eventId, status])
+  @@index([photographerId, status])
+}
+
+model QRLink {
+  id             String       @id @default(cuid())
+  code           String       @unique
+  photographerId String
+  photographer   Photographer @relation(fields: [photographerId], references: [id], onDelete: Cascade)
+  eventId        String?
+  event          Event?       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  albumId        String?
+  album          Album?       @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  status         QRLinkStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([photographerId, status])
+  @@index([eventId, status])
+  @@index([albumId, status])
+}
+
+model Photo {
+  id               String         @id @default(cuid())
+  albumId          String
+  album            Album          @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  title            String?
+  originalKey      String
+  previewKey       String
+  originalFilename String
+  mimeType         String
+  fileSize         Int
+  width            Int?
+  height           Int?
+  priceCents       Int            @default(1500)
+  currency         String         @default("USD")
+  status           PhotoStatus    @default(PUBLISHED)
+  metadata         Json?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  orderItems       OrderItem[]
+  faceRecords      PhotoFace[]
+  faceIndexJobs    FaceIndexJob[]
+}
+
+model PhotoFace {
+  id                  String                     @id @default(cuid())
+  photoId             String
+  photo               Photo                      @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  eventId             String
+  albumId             String
+  embedding           Unsupported("vector(512)")
+  detectionConfidence Float
+  boundingBox         Json
+  modelVersion        String
+  createdAt           DateTime                   @default(now())
+
+  @@unique([photoId, modelVersion])
+  @@index([eventId, modelVersion])
+  @@index([photoId, modelVersion])
+}
+
+model FaceIndexJob {
+  id          String             @id @default(cuid())
+  photoId     String
+  photo       Photo              @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  status      FaceIndexJobStatus @default(PENDING)
+  attempts    Int                @default(0)
+  lastError   String?
+  createdAt   DateTime           @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  updatedAt   DateTime           @updatedAt
+
+  @@unique([photoId])
+  @@index([status, createdAt])
+}
+
+model Order {
+  id                String          @id @default(cuid())
+  publicOrderCode   String          @unique
+  eventId           String
+  event             Event           @relation(fields: [eventId], references: [id])
+  photographerId    String
+  photographer      Photographer    @relation(fields: [photographerId], references: [id])
+  customerEmail     String
+  customerFirstName String?
+  customerLastName  String?
+  currency          String          @default("USD")
+  subtotalCents     Int
+  totalCents        Int
+  status            OrderStatus     @default(PENDING_PAYMENT)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  items             OrderItem[]
+  payment           Payment?
+  grants            DownloadGrant[]
+
+  @@index([photographerId, status])
+  @@index([customerEmail])
+}
+
+model OrderItem {
+  id               String   @id @default(cuid())
+  orderId          String
+  order            Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  photoId          String
+  photo            Photo    @relation(fields: [photoId], references: [id])
+  unitPriceCents   Int
+  currency         String   @default("USD")
+  originalFilename String?
+  createdAt        DateTime @default(now())
+
+  @@unique([orderId, photoId])
+}
+
+model Payment {
+  id                 String        @id @default(cuid())
+  orderId            String        @unique
+  order              Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider           String
+  providerPaymentId  String?
+  providerCheckoutId String?
+  amount             Int
+  currency           String        @default("USD")
+  status             PaymentStatus @default(PENDING)
+  idempotencyKey     String        @unique
+  rawResponse        Json?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  paidAt             DateTime?
+}
+
+model PaymentWebhookEvent {
+  id              String   @id @default(cuid())
+  provider        String
+  providerEventId String   @unique
+  createdAt       DateTime @default(now())
+}
+
+model DownloadGrant {
+  id         String              @id @default(cuid())
+  orderId    String
+  order      Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  tokenHash  String              @unique
+  status     DownloadGrantStatus @default(ACTIVE)
+  expiresAt  DateTime
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+  usageCount Int                 @default(0)
+
+  @@index([orderId, status])
+  @@index([expiresAt])
+}

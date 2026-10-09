@@ -1,9 +1,38 @@
-<!-- BEGIN:nextjs-agent-rules -->
+# StrideFrame — Agent Instructions
 
-## This is NOT the Next.js you know
+## Operating principles
+- Inspect before editing.
+- Preserve existing architecture unless a change is clearly justified.
+- Prefer incremental changes over broad rewrites.
+- Keep changes scoped to the requested iteration.
+- Do not implement unrelated features.
+- Never claim success unless validation checks actually pass.
+- If an architectural issue is discovered, document it before changing it.
+- Prefer reversible changes and avoid unnecessary dependencies.
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+## Git safety
+- Inspect git status before modifying files.
+- Do not force push or rewrite history.
+- Do not delete or overwrite unrelated user changes.
+- Do not commit secrets or real `.env` files.
 
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+## Engineering quality
+Before completing meaningful work, run `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build` when applicable. Always report changed/created files, migrations, routes, tests, validation results, risks, and remaining work.
 
-<!-- END:nextjs-agent-rules -->
+## Architecture discipline
+- Domain logic must not depend directly on infrastructure providers.
+- External providers must be abstracted behind interfaces/adapters.
+- Avoid hardcoding payment, storage, language, or deployment vendors.
+- Keep public customer and private photographer experiences separate.
+
+## Security
+- Never expose secrets or original photographs publicly.
+- Public galleries use previews only; originals require authorization.
+- Photographer resources must be ownership-isolated.
+- Validate untrusted inputs and prefer signed/temporary URLs for protected downloads.
+
+## Scope discipline
+- Do not implement facial recognition, AI, uploads, image processing, storage integration, checkout, payment webhooks, cart, download grants, or production deployment in this iteration.
+
+## Compatibility note
+If Next.js re-adds generated agent guidance, preserve this project policy and follow current docs in `node_modules/next/dist/docs/`.

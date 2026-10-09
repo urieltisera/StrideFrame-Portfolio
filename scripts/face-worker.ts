@@ -1,0 +1,5 @@
+import { claimFaceIndexJob, failFaceIndexJob, processFaceIndexJob } from "../src/lib/face-search";
+import { prisma } from "../src/lib/prisma";
+const batchSize=Number(process.env.FACE_WORKER_BATCH_SIZE||1);const pollMs=Number(process.env.FACE_WORKER_POLL_INTERVAL_MS||1000);let stopping=false;process.on("SIGINT",()=>{stopping=true});process.on("SIGTERM",()=>{stopping=true});
+async function main(){let processed=0;while(!stopping&&processed<batchSize){const jobId=await claimFaceIndexJob();if(!jobId){if(process.env.FACE_WORKER_DRAIN==="true")break;await new Promise(resolve=>setTimeout(resolve,pollMs));continue}try{const started=Date.now();const count=await processFaceIndexJob(jobId);console.info(JSON.stringify({jobId,modelVersion:process.env.FACE_MODEL_VERSION||"arcface-v1",detectedFaces:count,durationMs:Date.now()-started}));}catch(error){console.error(JSON.stringify({jobId,error:error instanceof Error?error.message:"face indexing failed"}));await failFaceIndexJob(jobId,error)}processed++}await prisma.$disconnect()}
+main().catch(async error=>{console.error(error);await prisma.$disconnect();process.exitCode=1});

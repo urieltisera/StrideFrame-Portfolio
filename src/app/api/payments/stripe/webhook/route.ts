@@ -1,0 +1,2 @@
+import {NextResponse} from "next/server"; import {processStripeWebhook} from "@/lib/payment-service";
+export async function POST(request:Request){const signature=request.headers.get("stripe-signature");if(!signature)return new NextResponse("Missing signature",{status:400});try{await processStripeWebhook(await request.text(),signature);return NextResponse.json({received:true})}catch(error){return new NextResponse(error instanceof Error?error.message:"Webhook rejected",{status:400})}}

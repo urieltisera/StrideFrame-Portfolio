@@ -1,0 +1,10 @@
+export const FACE_EMBEDDING_DIMENSION = Number(process.env.FACE_EMBEDDING_DIMENSION || 512);
+export const FACE_MODEL_VERSION = process.env.FACE_MODEL_VERSION || "arcface-v1";
+export const FACE_MATCH_THRESHOLD = Number(process.env.FACE_MATCH_THRESHOLD || 0.92);
+export const FACE_MATCH_LIMIT = Number(process.env.FACE_MATCH_LIMIT || 50);
+export const FACE_SELFIE_MAX_BYTES = Number(process.env.FACE_SELFIE_MAX_BYTES || 5 * 1024 * 1024);
+export const FACE_DETECTION_THRESHOLD = Number(process.env.FACE_DETECTION_THRESHOLD || 0.6);
+export const FACE_MIN_FACE_SIZE = Number(process.env.FACE_MIN_FACE_SIZE || 40);
+export const FACE_DETECTION_MODEL_PATH = process.env.FACE_DETECTION_MODEL_PATH || "models/scrfd.onnx";
+export const FACE_RECOGNITION_MODEL_PATH = process.env.FACE_RECOGNITION_MODEL_PATH || "models/arcface.onnx";
+if (!Number.isInteger(FACE_EMBEDDING_DIMENSION) || FACE_EMBEDDING_DIMENSION < 2) throw new Error("FACE_EMBEDDING_DIMENSION must be an integer >= 2");

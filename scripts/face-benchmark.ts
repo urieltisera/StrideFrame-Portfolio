@@ -1,0 +1,5 @@
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { faceProvider } from "../src/lib/face-provider";
+const directory=process.argv[2];if(!directory){console.error("Usage: npm run face-benchmark -- ./private-benchmark-data");process.exit(1)}
+const files=(await fs.readdir(directory)).map(file=>path.join(directory,file));const provider=faceProvider();const durations:number[]=[];let faces=0,failures=0;const started=Date.now();for(const file of files){try{const begin=Date.now();const detected=await provider.detectFaces(await fs.readFile(file));faces+=detected.length;durations.push(Date.now()-begin)}catch{failures++}}durations.sort((a,b)=>a-b);const percentile=(p:number)=>durations[Math.min(durations.length-1,Math.floor(durations.length*p))]||0;const seconds=(Date.now()-started)/1000;console.log(JSON.stringify({modelVersion:provider.modelVersion,totalImages:files.length,totalDetectedFaces:faces,imagesPerSecond:files.length/seconds,facesPerSecond:faces/seconds,averageMs:durations.reduce((a,b)=>a+b,0)/(durations.length||1),p50Ms:percentile(.5),p95Ms:percentile(.95),failures},null,2));

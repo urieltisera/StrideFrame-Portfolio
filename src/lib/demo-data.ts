@@ -1,0 +1,1 @@
+export const demoEvent = { slug: "spring-tournament", name: "Spring Tournament 2026", location: "North Athletic Club", date: "OCT 12, 2026", description: "Protected previews to share and purchase your best moments.", albums: [{ slug: "u18-final", name: "U18 Final", count: 128, cover: "⚽" }, { slug: "awards", name: "Awards ceremony", count: 42, cover: "🏆" }] };
