@@ -1,2 +1,99 @@
-import Link from "next/link"; import {redirect} from "next/navigation"; import {getCurrentPhotographer} from "@/lib/auth"; import {createEvent,logout} from "@/app/photographer/actions"; import {prisma} from "@/lib/prisma";
-export default async function Dashboard(){const person=await getCurrentPhotographer(); if(!person) redirect("/photographer/login"); const events=await prisma.event.findMany({where:{photographerId:person.id},include:{_count:{select:{albums:true}}},orderBy:{createdAt:"desc"}}); return <main className="min-h-screen"><nav className="flex justify-between border-b border-black/10 px-8 py-6"><b className="text-2xl">FRAME<span className="text-orange-500">HOUSE</span></b><form action={logout}><button className="text-sm text-slate-500">Sign out</button></form></nav><section className="mx-auto max-w-6xl px-8 py-12"><p className="text-xs font-bold uppercase tracking-[.3em] text-orange-500">Private dashboard</p><h1 className="mt-3 text-5xl font-black">Welcome, {person.name}.</h1><div className="mt-10 grid gap-4 md:grid-cols-3"><div className="rounded-3xl bg-[#10231f] p-6 text-white"><p className="text-sm text-white/60">Events</p><p className="mt-5 text-4xl font-black">{events.length}</p></div><div className="rounded-3xl bg-[#d8f3e6] p-6"><p className="text-sm">Sales</p><p className="mt-5 text-4xl font-black">$0.00</p><p className="mt-2 text-sm text-slate-500">Payments are not enabled yet.</p></div><div className="rounded-3xl bg-[#ffd9cf] p-6"><p className="text-sm">Photos sold</p><p className="mt-5 text-4xl font-black">0</p></div></div><div className="mt-14 grid gap-8 md:grid-cols-[1fr_360px]"><div><h2 className="text-2xl font-black">Your events</h2><div className="mt-5 space-y-4">{events.map(event=><Link href={`/photographer/events/${event.id}`} key={event.id} className="block rounded-3xl bg-white p-6 shadow-sm"><p className="text-xs font-bold uppercase tracking-widest text-emerald-600">{event.status}</p><h3 className="mt-2 text-2xl font-black">{event.title}</h3><p className="mt-1 text-sm text-slate-500">{event._count.albums} albums · /e/{event.slug}</p></Link>)}{events.length===0&&<div className="rounded-3xl border border-dashed p-8 text-slate-500">No events yet. Create your first event.</div>}</div></div><form action={createEvent} className="rounded-3xl bg-[#d8f3e6] p-7"><h2 className="text-xl font-black">New event</h2><div className="mt-5 space-y-3"><input name="title" required className="w-full rounded-xl border-0 bg-white p-3" placeholder="Event title"/><input name="slug" required pattern="[a-z0-9-]+" className="w-full rounded-xl border-0 bg-white p-3" placeholder="url-slug"/><textarea name="description" className="w-full rounded-xl border-0 bg-white p-3" placeholder="Description" rows={3}/><button className="w-full rounded-xl bg-[#10231f] p-3 font-bold text-white">Create event</button></div></form></div></section></main>}
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { Button } from "@/components/button";
+import { Card } from "@/components/card";
+import { EmptyState, PageHeader } from "@/components/feedback";
+import { Input } from "@/components/form-fields";
+import { PhotographerShell } from "@/components/photographer-shell";
+import { StatusBadge } from "@/components/badge";
+import { getCurrentPhotographer } from "@/lib/auth";
+import { createEvent, logout } from "@/app/photographer/actions";
+import { prisma } from "@/lib/prisma";
+
+export default async function Dashboard() {
+  const person = await getCurrentPhotographer();
+  if (!person) redirect("/photographer/login");
+
+  const events = await prisma.event.findMany({
+    where: { photographerId: person.id },
+    include: { _count: { select: { albums: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return (
+    <PhotographerShell accountName={person.name}>
+      <div className="flex justify-end">
+        <form action={logout}>
+          <Button type="submit" variant="ghost">Sign out</Button>
+        </form>
+      </div>
+      <PageHeader
+        eyebrow="Photographer workspace"
+        title={`Welcome, ${person.name}.`}
+        description="Keep your event work moving from first upload to public gallery."
+        action={<Link href="#new-event"><Button type="button">Create event</Button></Link>}
+      />
+
+      <section aria-label="Business overview" className="mt-8 grid gap-4 md:grid-cols-3">
+        <Card variant="elevated" className="border-[var(--accent)]/25 p-6">
+          <p className="sf-label">Events</p>
+          <p className="mt-5 text-4xl font-black tracking-tight">{events.length}</p>
+          <p className="sf-body-secondary mt-2">Your active event library</p>
+        </Card>
+        <Card className="p-6">
+          <p className="sf-label">Sales</p>
+          <p className="mt-5 text-4xl font-black tracking-tight">$0.00</p>
+          <p className="sf-body-secondary mt-2">Payments are not enabled yet.</p>
+        </Card>
+        <Card className="p-6">
+          <p className="sf-label">Photos sold</p>
+          <p className="mt-5 text-4xl font-black tracking-tight">0</p>
+          <p className="sf-body-secondary mt-2">Sales reporting will appear here</p>
+        </Card>
+      </section>
+
+      <div className="mt-12 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <section id="events" aria-labelledby="events-heading">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="sf-label text-[var(--accent)]">Library</p>
+              <h2 id="events-heading" className="sf-section-title mt-2">Your events</h2>
+            </div>
+            {events.length > 0 && <span className="sf-caption">{events.length} total</span>}
+          </div>
+          <div className="mt-5 grid gap-3">
+            {events.map((event) => (
+              <Link href={`/photographer/events/${event.id}`} key={event.id}>
+                <Card variant="interactive" className="p-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h3 className="sf-card-title truncate">{event.title}</h3>
+                        <StatusBadge status={event.status} />
+                      </div>
+                      <p className="sf-body-secondary mt-2">{event._count.albums} albums <span className="text-[var(--text-muted)]">·</span> /e/{event.slug}</p>
+                    </div>
+                    <span aria-hidden="true" className="text-xl text-[var(--text-muted)]">→</span>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+            {events.length === 0 && <EmptyState title="No events yet" description="Create your first event to start organizing a new gallery." action={<Link href="#new-event"><Button type="button">Create your first event</Button></Link>} />}
+          </div>
+        </section>
+
+        <Card id="new-event" className="h-fit p-6 md:p-7">
+          <p className="sf-label text-[var(--accent)]">Quick action</p>
+          <h2 className="sf-section-title mt-2">New event</h2>
+          <p className="sf-body-secondary mt-2">Set up the event details first. You can add albums and photos next.</p>
+          <form action={createEvent} className="mt-6 grid gap-4">
+            <Input id="event-title" name="title" label="Title" required placeholder="Miami Marathon 2026" />
+            <Input id="event-slug" name="slug" label="Public URL slug" required pattern="[a-z0-9-]+" placeholder="miami-marathon-2026" />
+            <label htmlFor="event-description" className="grid gap-2"><span className="sf-label">Description</span><textarea id="event-description" name="description" className="min-h-24 rounded-[var(--radius-medium)] border border-[var(--border)] bg-[var(--surface-elevated)] p-3 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]" placeholder="A short description for your event" rows={3} /></label>
+            <Button type="submit" className="mt-1 w-full">Create event</Button>
+          </form>
+        </Card>
+      </div>
+    </PhotographerShell>
+  );
+}
