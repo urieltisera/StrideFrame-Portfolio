@@ -9,16 +9,20 @@ import { StatusBadge } from "@/components/badge";
 import { getCurrentPhotographer } from "@/lib/auth";
 import { createEvent, logout } from "@/app/photographer/actions";
 import { prisma } from "@/lib/prisma";
+import { formatUsd } from "@/lib/money";
 
 export default async function Dashboard() {
   const person = await getCurrentPhotographer();
   if (!person) redirect("/photographer/login");
 
-  const events = await prisma.event.findMany({
-    where: { photographerId: person.id },
-    include: { _count: { select: { albums: true } } },
-    orderBy: { createdAt: "desc" },
-  });
+  const [events, orders] = await Promise.all([
+    prisma.event.findMany({ where: { photographerId: person.id }, include: { _count: { select: { albums: true } } }, orderBy: { createdAt: "desc" } }),
+    prisma.order.findMany({ where: { photographerId: person.id }, include: { items: true }, orderBy: { createdAt: "desc" }, take: 8 }),
+  ]);
+  const paidOrders = orders.filter((order) => order.status === "PAID");
+  const revenueCents = paidOrders.reduce((sum, order) => sum + order.totalCents, 0);
+  const photosSold = paidOrders.reduce((sum, order) => sum + order.items.length, 0);
+  const customers = new Set(paidOrders.map((order) => order.customerEmail)).size;
 
   return (
     <PhotographerShell accountName={person.name}>
@@ -34,21 +38,26 @@ export default async function Dashboard() {
         action={<Link href="#new-event"><Button type="button">Create event</Button></Link>}
       />
 
-      <section aria-label="Business overview" className="mt-8 grid gap-4 md:grid-cols-3">
+      <section aria-label="Business overview" className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card variant="elevated" className="border-[var(--accent)]/25 p-6">
           <p className="sf-label">Events</p>
           <p className="mt-5 text-4xl font-black tracking-tight">{events.length}</p>
           <p className="sf-body-secondary mt-2">Your active event library</p>
         </Card>
         <Card className="p-6">
-          <p className="sf-label">Sales</p>
-          <p className="mt-5 text-4xl font-black tracking-tight">$0.00</p>
-          <p className="sf-body-secondary mt-2">Payments are not enabled yet.</p>
+          <p className="sf-label">Total sales</p>
+          <p className="mt-5 text-4xl font-black tracking-tight">{formatUsd(revenueCents)}</p>
+          <p className="sf-body-secondary mt-2">Verified paid orders</p>
         </Card>
         <Card className="p-6">
           <p className="sf-label">Photos sold</p>
-          <p className="mt-5 text-4xl font-black tracking-tight">0</p>
-          <p className="sf-body-secondary mt-2">Sales reporting will appear here</p>
+          <p className="mt-5 text-4xl font-black tracking-tight">{photosSold}</p>
+          <p className="sf-body-secondary mt-2">Across paid orders</p>
+        </Card>
+        <Card className="p-6">
+          <p className="sf-label">Customers</p>
+          <p className="mt-5 text-4xl font-black tracking-tight">{customers}</p>
+          <p className="sf-body-secondary mt-2">Unique paid customers</p>
         </Card>
       </section>
 
@@ -94,6 +103,7 @@ export default async function Dashboard() {
           </form>
         </Card>
       </div>
+      <section className="mt-10" aria-labelledby="orders-heading"><div className="flex items-end justify-between gap-4"><div><p className="sf-label text-[var(--accent)]">Commerce</p><h2 id="orders-heading" className="sf-section-title mt-2">Recent orders</h2></div><span className="sf-caption">{orders.length} recent</span></div><Card className="mt-5 overflow-hidden p-0"><div className="divide-y divide-[var(--border)]">{orders.length ? orders.map((order) => <div key={order.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div><p className="font-bold">{order.publicOrderCode}</p><p className="sf-caption mt-1">{order.customerEmail} · {order.items.length} photos</p></div><div className="flex items-center gap-4"><span className="font-black">{formatUsd(order.totalCents)}</span><StatusBadge status={order.status} /></div></div>) : <div className="p-6"><EmptyState title="No orders yet" description="Verified customer orders will appear here." /></div>}</div></Card></section>
     </PhotographerShell>
   );
 }

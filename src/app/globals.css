@@ -1,9 +1,11 @@
 @import "tailwindcss";
+@source "../../src";
 
 :root {
-  --background: #0b1117; --surface: #111a23; --surface-elevated: #17222d; --surface-interactive: #1d2a36;
-  --border: #263542; --border-strong: #3a4c5b; --text-primary: #f4f7f5; --text-secondary: #b4c0c8; --text-muted: #7f909d;
-  --accent: #b8f35b; --accent-hover: #cbff78; --accent-foreground: #10180d; --success: #55d69a; --warning: #f3c969; --error: #f27e7e; --info: #79b9f2;
+  --background: #f4f6fb; --surface: #ffffff; --surface-elevated: #f8f9fc; --surface-interactive: #eef0ff;
+  --border: #e4e7ef; --border-strong: #cdd3e0; --text-primary: #172033; --text-secondary: #667085; --text-muted: #98a2b3;
+  --accent: #6d4aff; --accent-hover: #5938e8; --accent-foreground: #ffffff; --success: #16a36b; --warning: #d98917; --error: #d0445b; --info: #3d7edb;
+  --navy: #0d1630; --navy-soft: #162044;
   --radius-small: .5rem; --radius-medium: .75rem; --radius-large: 1.125rem; --radius-pill: 999px;
   --shadow-card: 0 8px 24px rgb(0 0 0 / .12); --shadow-elevated: 0 16px 40px rgb(0 0 0 / .2); --shadow-modal: 0 24px 64px rgb(0 0 0 / .32);
 }
@@ -21,3 +23,7 @@ button, input, select, textarea { font: inherit; }
 .sf-label { color: var(--text-secondary); font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .sf-caption { color: var(--text-muted); font-size: .75rem; line-height: 1.4; }
 .sf-focus:focus-visible, button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.sf-gradient { background: linear-gradient(135deg, #151f42 0%, #26336f 55%, #6d4aff 100%); }
+.sf-dot-grid { background-image: radial-gradient(#ffffff1c 1px, transparent 1px); background-size: 18px 18px; }
+.sf-glass { background: rgb(255 255 255 / .78); backdrop-filter: blur(16px); }
+.sf-photo-placeholder { background: linear-gradient(135deg, #1a2750 0%, #4856a0 50%, #d8b98c 100%); }
