@@ -1,20 +1,15 @@
-const MAX_BPS = 10_000;
+export const STRIDEFRAME_MVP_FEE_PER_PHOTO_USD = 0.25;
+export const MVP_PLATFORM_FEE_PER_PHOTO_CENTS = 25;
 
-export function platformFeeBps() {
-  const raw = process.env.STRIDEFRAME_PLATFORM_FEE_BPS;
-  if (raw === undefined || raw.trim() === "") throw new Error("STRIDEFRAME_PLATFORM_FEE_BPS is required");
-  if (!/^\d+$/.test(raw)) throw new Error("STRIDEFRAME_PLATFORM_FEE_BPS must be an integer between 0 and 10000");
-  const bps = Number(raw);
-  if (!Number.isSafeInteger(bps) || bps < 0 || bps > MAX_BPS) throw new Error("STRIDEFRAME_PLATFORM_FEE_BPS must be an integer between 0 and 10000");
-  return bps;
+/** The approved MVP fee is independent of the photographer's sale price. */
+export function platformFeePerPhotoCents() {
+  return MVP_PLATFORM_FEE_PER_PHOTO_CENTS;
 }
 
-/** Calculates the nearest minor unit, with half-cent values rounded up. */
-export function calculatePlatformFeeCents(grossCents: number, bps = platformFeeBps()) {
-  if (!Number.isSafeInteger(grossCents) || grossCents < 0) throw new Error("Gross amount must be a non-negative integer");
-  if (!Number.isSafeInteger(bps) || bps < 0 || bps > MAX_BPS) throw new Error("Platform fee basis points are invalid");
-  const fee = Math.floor((grossCents * bps + MAX_BPS / 2) / MAX_BPS);
-  return Math.min(fee, grossCents);
+export function calculatePlatformFeeCents(billablePhotoCount: number, feePerPhotoCents = platformFeePerPhotoCents()) {
+  if (!Number.isSafeInteger(billablePhotoCount) || billablePhotoCount < 0) throw new Error("Billable photo count must be a non-negative integer");
+  if (!Number.isSafeInteger(feePerPhotoCents) || feePerPhotoCents < 0) throw new Error("Platform fee per photo must be a non-negative integer");
+  return billablePhotoCount * feePerPhotoCents;
 }
 
 export function calculateProceedsCents(grossCents: number, feeCents: number) {

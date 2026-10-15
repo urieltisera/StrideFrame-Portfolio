@@ -65,6 +65,14 @@ enum ManualPaymentAction {
   REJECTED
 }
 
+enum ZelleFeeSettlementStatus {
+  OPEN
+  ROLLED_FORWARD
+  INVOICED
+  PAID
+  VOID
+}
+
 model Photographer {
   id                   String                @id @default(cuid())
   email                String                @unique
@@ -79,6 +87,7 @@ model Photographer {
   stripeConnectAccount StripeConnectAccount?
   paymentSettings      PhotographerPaymentSettings?
   manualPaymentAudits  ManualPaymentAudit[]
+  zelleFeeObligations  ZelleFeeObligation[]
 
   @@index([createdAt])
 }
@@ -245,6 +254,7 @@ model Order {
   payment           Payment?
   grants            DownloadGrant[]
   manualPaymentAudits ManualPaymentAudit[]
+  zelleFeeObligation ZelleFeeObligation?
 
   @@index([photographerId, status])
   @@index([customerEmail])
@@ -275,6 +285,8 @@ model Payment {
   currency                  String        @default("USD")
   platformFeeCents          Int           @default(0)
   photographerProceedsCents Int           @default(0)
+  billablePhotoCount        Int           @default(0)
+  platformFeePerPhotoCents  Int           @default(25)
   connectedAccountId        String?
   providerChargeId          String?
   providerApplicationFeeId  String?
@@ -282,6 +294,7 @@ model Payment {
   idempotencyKey            String        @unique
   rawResponse               Json?
   manualAudits              ManualPaymentAudit[]
+  zelleFeeObligation        ZelleFeeObligation?
   createdAt                 DateTime      @default(now())
   updatedAt                 DateTime      @updatedAt
   paidAt                    DateTime?
@@ -307,6 +320,29 @@ model ManualPaymentAudit {
   @@unique([paymentId, action])
   @@index([photographerId, action, createdAt])
   @@index([orderId, createdAt])
+}
+
+model ZelleFeeObligation {
+  id                 String                  @id @default(cuid())
+  photographerId     String
+  photographer       Photographer            @relation(fields: [photographerId], references: [id], onDelete: Restrict)
+  orderId            String                  @unique
+  order              Order                   @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  paymentId          String                  @unique
+  payment            Payment                 @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  billablePhotoCount Int
+  feePerPhotoCents   Int
+  amountCents        Int
+  currency           String                  @default("USD")
+  status             ZelleFeeSettlementStatus @default(OPEN)
+  earnedAt           DateTime                @default(now())
+  settledAt          DateTime?
+  voidedAt           DateTime?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  @@index([photographerId, status, earnedAt])
+  @@index([status, earnedAt])
 }
 
 model PaymentWebhookEvent {

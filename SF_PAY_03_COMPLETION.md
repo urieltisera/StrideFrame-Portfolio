@@ -19,6 +19,8 @@ SF-PAY-03: IMPLEMENTED — SAFE MVP FOUNDATION
 - Added `AWAITING_PAYMENT_CONFIRMATION` for safe manual Zelle payment state.
   Zelle orders retain server-calculated amount/currency/commission snapshots,
   but never transition to PAID or create a DownloadGrant from customer input.
+- The later SF-COM-02 slice defines the approved commission snapshot as a fixed
+  USD $0.25 per sold photo, independent of the photographer's price.
 
 ## Security boundaries
 

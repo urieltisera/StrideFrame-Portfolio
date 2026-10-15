@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import Stripe from "stripe";
 import { paymentProvider, StripePaymentProvider } from "./payments";
+import { calculatePlatformFeeCents } from "./commission";
 
 describe("payment provider", () => {
   it("rejects unsupported providers without fallback", () => {
@@ -24,7 +25,7 @@ describe("payment provider", () => {
     const create = vi.fn().mockResolvedValue({ id: "cs_test", url: "https://checkout.test", payment_intent: "pi_test" });
     const fakeStripe = { checkout: { sessions: { create } } } as unknown as Stripe;
     const provider = new StripePaymentProvider(fakeStripe);
-    await provider.createCheckout({ paymentId: "payment_1", publicOrderCode: "ORDER-1", amountCents: 1000, platformFeeCents: 100, connectedAccountId: "acct_test", currency: "USD", customerEmail: "buyer@example.com", successUrl: "https://app.test/success", cancelUrl: "https://app.test/cancel" });
+    await provider.createCheckout({ paymentId: "payment_1", publicOrderCode: "ORDER-1", amountCents: 4000, platformFeeCents: calculatePlatformFeeCents(4), connectedAccountId: "acct_test", currency: "USD", customerEmail: "buyer@example.com", successUrl: "https://app.test/success", cancelUrl: "https://app.test/cancel" });
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ payment_intent_data: { application_fee_amount: 100, transfer_data: { destination: "acct_test" }, metadata: { strideframeOrderCode: "ORDER-1", paymentId: "payment_1" } } }), { idempotencyKey: "payment_1" });
   });
 });

@@ -103,7 +103,6 @@ Configure only test credentials locally:
 PAYMENT_PROVIDER=stripe
 STRIPE_SECRET_KEY=<test-mode secret supplied through the runtime secret manager>
 STRIPE_WEBHOOK_SECRET=<test-mode signing secret supplied through the runtime secret manager>
-STRIDEFRAME_PLATFORM_FEE_BPS=1000 # explicit test/config value; basis points, 1000 = 10%
 PUBLIC_BASE_URL=http://localhost:3000
 ```
 

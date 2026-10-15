@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { prisma } from "./prisma";
 import { downloadTokenHash } from "./downloads";
+import { calculatePlatformFeeCents, platformFeePerPhotoCents } from "./commission";
 
 const MAX_NOTE_LENGTH = 500;
 
@@ -39,7 +40,8 @@ async function decideManualPayment(input: { photographerId: string; orderId: str
     if (payment.provider !== "ZELLE") throw new Error("Manual confirmation is only available for Zelle");
     const previousAction = await tx.manualPaymentAudit.findUnique({ where: { paymentId_action: { paymentId: payment.id, action: input.action } } });
     if (previousAction) return { order, payment, audit: previousAction, idempotent: true };
-    if (payment.amount !== order.totalCents || payment.currency !== order.currency || !Number.isSafeInteger(payment.amount) || payment.amount < 0) throw new Error("Payment amount or currency mismatch");
+    if (order.currency !== "USD" || payment.amount !== order.totalCents || payment.currency !== order.currency || !Number.isSafeInteger(payment.amount) || payment.amount < 0) throw new Error("Payment amount or currency mismatch");
+    if (payment.billablePhotoCount < 0 || payment.platformFeePerPhotoCents !== platformFeePerPhotoCents() || payment.platformFeeCents !== calculatePlatformFeeCents(payment.billablePhotoCount, payment.platformFeePerPhotoCents)) throw new Error("Platform fee snapshot is invalid");
     if (order.status !== "AWAITING_PAYMENT_CONFIRMATION" || payment.status !== "AWAITING_PAYMENT_CONFIRMATION") throw new Error("Zelle payment is not awaiting confirmation");
 
     const resultingOrderStatus = input.action === "CONFIRMED" ? "PAID" : "CANCELLED";
@@ -52,6 +54,7 @@ async function decideManualPayment(input: { photographerId: string; orderId: str
     const audit = await tx.manualPaymentAudit.create({ data: { orderId: order.id, paymentId: payment.id, photographerId: input.photographerId, provider: payment.provider, action: input.action, previousOrderStatus: order.status, resultingOrderStatus, previousPaymentStatus: payment.status, resultingPaymentStatus, note } });
 
     if (input.action === "CONFIRMED") {
+      await tx.zelleFeeObligation.upsert({ where: { paymentId: payment.id }, create: { photographerId: input.photographerId, orderId: order.id, paymentId: payment.id, billablePhotoCount: payment.billablePhotoCount, feePerPhotoCents: payment.platformFeePerPhotoCents, amountCents: payment.platformFeeCents, currency: payment.currency, status: "OPEN" }, update: {} });
       const token = crypto.randomBytes(32).toString("base64url");
       const existingGrant = await tx.downloadGrant.findUnique({ where: { orderId: order.id } });
       const expiresAt = new Date(Date.now() + Number(process.env.DOWNLOAD_GRANT_TTL_HOURS || 72) * 60 * 60 * 1000);
@@ -60,4 +63,9 @@ async function decideManualPayment(input: { photographerId: string; orderId: str
     }
     return { order: updatedOrder, payment: updatedPayment, audit, idempotent: false };
   });
+}
+
+export async function getZelleFeeSummary(photographerId: string) {
+  const obligations = await prisma.zelleFeeObligation.findMany({ where: { photographerId, status: { in: ["OPEN", "ROLLED_FORWARD", "INVOICED"] } }, select: { amountCents: true, currency: true, status: true } });
+  return { amountCents: obligations.reduce((sum, obligation) => sum + obligation.amountCents, 0), currency: obligations[0]?.currency || "USD", count: obligations.length, statuses: obligations.map((obligation) => obligation.status) };
 }

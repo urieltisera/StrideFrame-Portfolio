@@ -1,20 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { calculatePlatformFeeCents, calculateProceedsCents, platformFeeBps } from "./commission";
+import { calculatePlatformFeeCents, calculateProceedsCents, MVP_PLATFORM_FEE_PER_PHOTO_CENTS, platformFeePerPhotoCents } from "./commission";
 
-describe("platform commission", () => {
-  it("calculates integer minor units using nearest-cent half-up rounding", () => {
-    expect(calculatePlatformFeeCents(1000, 1000)).toBe(100);
-    expect(calculatePlatformFeeCents(999, 333)).toBe(33);
-    expect(calculateProceedsCents(999, 33)).toBe(966);
+describe("fixed per-photo platform fee", () => {
+  it.each([[1, 25], [2, 50], [10, 250], [37, 925]])("charges %s sold photos %s cents", (count, expected) => {
+    expect(calculatePlatformFeeCents(count)).toBe(expected);
   });
 
-  it("rejects missing or out-of-range configuration", () => {
-    const previous = process.env.STRIDEFRAME_PLATFORM_FEE_BPS;
-    delete process.env.STRIDEFRAME_PLATFORM_FEE_BPS;
-    expect(() => platformFeeBps()).toThrow("required");
-    process.env.STRIDEFRAME_PLATFORM_FEE_BPS = "10001";
-    expect(() => platformFeeBps()).toThrow("between 0 and 10000");
-    if (previous === undefined) delete process.env.STRIDEFRAME_PLATFORM_FEE_BPS;
-    else process.env.STRIDEFRAME_PLATFORM_FEE_BPS = previous;
+  it("does not depend on photographer sale price", () => {
+    expect(calculatePlatformFeeCents(4)).toBe(100);
+    expect(platformFeePerPhotoCents()).toBe(MVP_PLATFORM_FEE_PER_PHOTO_CENTS);
+  });
+
+  it("calculates photographer proceeds after the fixed fee", () => {
+    expect(calculateProceedsCents(4000, calculatePlatformFeeCents(4))).toBe(3900);
+  });
+
+  it("rejects invalid billable counts", () => {
+    expect(() => calculatePlatformFeeCents(-1)).toThrow("count");
+    expect(() => calculatePlatformFeeCents(1.5)).toThrow("count");
   });
 });

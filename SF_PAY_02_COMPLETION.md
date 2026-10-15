@@ -67,10 +67,11 @@ Stripe idempotency key, generates Stripe-hosted Account Links, and synchronizes
 capability/readiness state. No banking credentials are collected or stored by
 StrideFrame. Endpoints derive the photographer from the authenticated session.
 
-## Checkout and commission
+## Checkout and commercial fee
 
-- `STRIDEFRAME_PLATFORM_FEE_BPS` is the server-side MVP configuration boundary.
-- It is validated as an integer from 0 through 10,000 basis points.
+- The approved MVP commercial model is a fixed USD $0.25 fee per sold photo.
+- The fee is calculated from trusted server-side order items, never from gross
+  order value or browser-supplied quantity.
 - Fee calculation uses integer minor units and nearest-cent half-up rounding.
 - Photographer proceeds are `gross - platformFee`.
 - Fee/proceeds/connected-account snapshots are stored on `Payment`.
@@ -78,8 +79,9 @@ StrideFrame. Endpoints derive the photographer from the authenticated session.
   `chargesEnabled` and `payoutsEnabled` and is `READY`.
 - Existing Stripe metadata and idempotency behavior are preserved.
 
-No permanent business percentage was hardcoded. The README documents `1000`
-basis points only as an explicit test/configuration example.
+The photographer's selling price remains independent from the fixed per-photo
+StrideFrame fee. Stripe processing fees remain separate from StrideFrame's
+platform fee.
 
 ## Webhook hardening
 
@@ -106,7 +108,7 @@ remain deferred to SF-PAY-06.
 
 Focused tests cover:
 
-- integer commission calculation, rounding, proceeds, and config validation;
+- fixed per-photo commission calculation and proceeds;
 - Connect readiness requiring both charge and payout capability;
 - repeated Connect onboarding reusing the stored account without a duplicate
   account creation;

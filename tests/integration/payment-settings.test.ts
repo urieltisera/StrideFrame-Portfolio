@@ -12,6 +12,7 @@ const hasDatabase = Boolean(process.env.TEST_DATABASE_URL);
 describe.skipIf(!hasDatabase)("photographer payment settings and Zelle boundary", () => {
   beforeEach(async () => {
     await db.downloadGrant.deleteMany();
+    await db.zelleFeeObligation.deleteMany();
     await db.orderItem.deleteMany();
     await db.payment.deleteMany();
     await db.order.deleteMany();
@@ -20,7 +21,6 @@ describe.skipIf(!hasDatabase)("photographer payment settings and Zelle boundary"
     await db.event.deleteMany();
     await db.photographerPaymentSettings.deleteMany();
     await db.photographer.deleteMany();
-    process.env.STRIDEFRAME_PLATFORM_FEE_BPS = "1000";
   });
 
   it("defaults Zelle off and isolates each photographer's settings", async () => {
@@ -49,7 +49,7 @@ describe.skipIf(!hasDatabase)("photographer payment settings and Zelle boundary"
     expect(stored?.status).toBe("AWAITING_PAYMENT_CONFIRMATION");
     expect(stored?.payment?.status).toBe("AWAITING_PAYMENT_CONFIRMATION");
     expect(stored?.payment?.provider).toBe("ZELLE");
-    expect(stored?.payment?.platformFeeCents).toBe(275);
+    expect(stored?.payment?.platformFeeCents).toBe(25);
     expect(stored?.grants).toHaveLength(0);
   });
 
@@ -87,5 +87,19 @@ describe.skipIf(!hasDatabase)("photographer payment settings and Zelle boundary"
     await expect(confirmManualPayment({ photographerId: owner.id, orderId: rejectedOrder.id })).rejects.toThrow("not awaiting confirmation");
     const rejectedStored = await db.order.findUnique({ where: { id: rejectedOrder.id }, include: { grants: true } });
     expect(rejectedStored?.grants).toHaveLength(0);
+  });
+
+  it("snapshots the fixed fee for every sold photo", async () => {
+    const photographer = await db.photographer.create({ data: { email: "bundle-owner@example.com", name: "Bundle Owner", passwordHash: "x" } });
+    await db.photographerPaymentSettings.create({ data: { photographerId: photographer.id, zelleEnabled: true, zelleDisplayName: "Bundle Photos", zellePaymentIdentifier: "bundle@example.com" } });
+    const event = await db.event.create({ data: { photographerId: photographer.id, title: "Bundle Event", slug: "bundle-event", accessCode: "bundle-code", status: "PUBLISHED" } });
+    const album = await db.album.create({ data: { photographerId: photographer.id, eventId: event.id, title: "Bundle", slug: "bundle", status: "PUBLISHED" } });
+    const photos = await Promise.all([1, 2, 3, 4].map((index) => db.photo.create({ data: { albumId: album.id, originalKey: `private/bundle-${index}`, previewKey: `public/bundle-${index}`, originalFilename: `bundle-${index}.jpg`, mimeType: "image/jpeg", fileSize: 10, priceCents: 1000, currency: "USD", status: "PUBLISHED" } })));
+    const order = await createPendingOrder({ photoIds: photos.map((photo) => photo.id), email: "bundle-buyer@example.com" });
+    await startZellePayment(order.publicOrderCode);
+    await confirmManualPayment({ photographerId: photographer.id, orderId: order.id });
+    const obligation = await db.zelleFeeObligation.findUnique({ where: { orderId: order.id } });
+    expect(order.totalCents).toBe(4000);
+    expect(obligation).toMatchObject({ billablePhotoCount: 4, feePerPhotoCents: 25, amountCents: 100, currency: "USD", status: "OPEN" });
   });
 });
