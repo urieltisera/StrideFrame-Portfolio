@@ -28,6 +28,13 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum StripeConnectStatus {
+  ONBOARDING
+  READY
+  RESTRICTED
+  DISABLED
+}
+
 enum PhotoStatus {
   DRAFT
   PUBLISHED
@@ -52,18 +59,34 @@ enum FaceIndexJobStatus {
 }
 
 model Photographer {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String
-  passwordHash String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  events       Event[]
-  albums       Album[]
-  qrLinks      QRLink[]
-  orders       Order[]
+  id                   String                @id @default(cuid())
+  email                String                @unique
+  name                 String
+  passwordHash         String
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  events               Event[]
+  albums               Album[]
+  qrLinks              QRLink[]
+  orders               Order[]
+  stripeConnectAccount StripeConnectAccount?
 
   @@index([createdAt])
+}
+
+model StripeConnectAccount {
+  id               String              @id @default(cuid())
+  photographerId   String              @unique
+  photographer     Photographer        @relation(fields: [photographerId], references: [id], onDelete: Cascade)
+  stripeAccountId  String              @unique
+  status           StripeConnectStatus @default(ONBOARDING)
+  detailsSubmitted Boolean             @default(false)
+  chargesEnabled   Boolean             @default(false)
+  payoutsEnabled   Boolean             @default(false)
+  currentlyDue     Json?
+  disabledReason   String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 }
 
 model Event {
@@ -217,27 +240,36 @@ model OrderItem {
 }
 
 model Payment {
-  id                 String        @id @default(cuid())
-  orderId            String        @unique
-  order              Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  provider           String
-  providerPaymentId  String?
-  providerCheckoutId String?
-  amount             Int
-  currency           String        @default("USD")
-  status             PaymentStatus @default(PENDING)
-  idempotencyKey     String        @unique
-  rawResponse        Json?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
-  paidAt             DateTime?
+  id                        String        @id @default(cuid())
+  orderId                   String        @unique
+  order                     Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider                  String
+  providerPaymentId         String?
+  providerCheckoutId        String?
+  amount                    Int
+  currency                  String        @default("USD")
+  platformFeeCents          Int           @default(0)
+  photographerProceedsCents Int           @default(0)
+  connectedAccountId        String?
+  providerChargeId          String?
+  providerApplicationFeeId  String?
+  status                    PaymentStatus @default(PENDING)
+  idempotencyKey            String        @unique
+  rawResponse               Json?
+  createdAt                 DateTime      @default(now())
+  updatedAt                 DateTime      @updatedAt
+  paidAt                    DateTime?
 }
 
 model PaymentWebhookEvent {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   provider        String
-  providerEventId String   @unique
-  createdAt       DateTime @default(now())
+  providerEventId String    @unique
+  attempts        Int       @default(0)
+  processedAt     DateTime?
+  lastError       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
 model DownloadGrant {
@@ -253,6 +285,7 @@ model DownloadGrant {
   lastUsedAt DateTime?
   usageCount Int                 @default(0)
 
+  @@unique([orderId])
   @@index([orderId, status])
   @@index([expiresAt])
 }

@@ -16,11 +16,12 @@ function ttlHours() {
 export async function createDownloadGrant(orderId: string) {
   const order = await prisma.order.findUnique({ where: { id: orderId }, select: { id: true, status: true } });
   if (!order || order.status !== "PAID") throw new Error("Downloads are not available for this order");
-  const existing = await prisma.downloadGrant.findFirst({ where: { orderId, status: "ACTIVE", expiresAt: { gt: new Date() } } });
-  if (existing) return null;
+  const existing = await prisma.downloadGrant.findUnique({ where: { orderId } });
+  if (existing?.status === "ACTIVE" && existing.expiresAt > new Date()) return null;
   const token = crypto.randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + ttlHours() * 60 * 60 * 1000);
-  await prisma.downloadGrant.create({ data: { orderId, tokenHash: hashToken(token), expiresAt, status: "ACTIVE" } });
+  if (existing) await prisma.downloadGrant.update({ where: { id: existing.id }, data: { tokenHash: hashToken(token), expiresAt, status: "ACTIVE", revokedAt: null, lastUsedAt: null, usageCount: 0 } });
+  else await prisma.downloadGrant.create({ data: { orderId, tokenHash: hashToken(token), expiresAt, status: "ACTIVE" } });
   return { token, expiresAt };
 }
 
