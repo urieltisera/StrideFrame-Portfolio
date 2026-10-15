@@ -15,7 +15,7 @@ function ttlHours() {
 
 export async function createDownloadGrant(orderId: string, options: { rotate?: boolean } = {}) {
   const order = await prisma.order.findUnique({ where: { id: orderId }, select: { id: true, status: true } });
-  if (!order || order.status !== "PAID") throw new Error("Downloads are not available for this order");
+  if (!order || (order.status !== "PAID" && order.status !== "PARTIALLY_REFUNDED")) throw new Error("Downloads are not available for this order");
   const existing = await prisma.downloadGrant.findUnique({ where: { orderId } });
   if (existing?.status === "ACTIVE" && existing.expiresAt > new Date() && !options.rotate) return null;
   const token = crypto.randomBytes(32).toString("base64url");
@@ -28,11 +28,11 @@ export async function createDownloadGrant(orderId: string, options: { rotate?: b
 export async function authorizeDownload(token: string, photoId: string) {
   if (!token || !photoId) throw new Error("Download unavailable");
   const grant = await prisma.downloadGrant.findUnique({ where: { tokenHash: hashToken(token) }, include: { order: true } });
-  if (!grant || grant.status !== "ACTIVE" || grant.expiresAt <= new Date() || grant.order.status !== "PAID") {
+  if (!grant || grant.status !== "ACTIVE" || grant.expiresAt <= new Date() || (grant.order.status !== "PAID" && grant.order.status !== "PARTIALLY_REFUNDED")) {
     if (grant?.status === "ACTIVE" && grant.expiresAt <= new Date()) await prisma.downloadGrant.update({ where: { id: grant.id }, data: { status: "EXPIRED" } });
     throw new Error("Download unavailable");
   }
-  const item = await prisma.orderItem.findFirst({ where: { orderId: grant.orderId, photoId }, include: { photo: true } });
+  const item = await prisma.orderItem.findFirst({ where: { orderId: grant.orderId, photoId, refundedAt: null }, include: { photo: true } });
   if (!item) throw new Error("Download unavailable");
   await prisma.downloadGrant.update({ where: { id: grant.id }, data: { lastUsedAt: new Date(), usageCount: { increment: 1 } } });
   return { grantId: grant.id, photo: item.photo };

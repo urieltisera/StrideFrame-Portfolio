@@ -3,7 +3,7 @@ import { prisma } from "./prisma";
 import { PRODUCT_NAME } from "./product";
 
 export type PaymentStatus = "PENDING" | "SUCCEEDED" | "FAILED" | "CANCELLED" | "REFUNDED";
-export type WebhookPaymentResult = { providerPaymentId: string; paymentId: string; status: PaymentStatus | null; ignored?: boolean };
+export type WebhookPaymentResult = { providerPaymentId: string; paymentId: string; status: PaymentStatus | null; ignored?: boolean; dispute?: { providerDisputeId: string; providerEventId: string; status: "OPEN" | "WON" | "LOST"; amountCents: number; currency: string; reason?: string } };
 export type CheckoutRequest = {
   paymentId: string;
   publicOrderCode: string;
@@ -22,7 +22,7 @@ export interface PaymentProvider {
   getPaymentStatus(id: string): Promise<PaymentStatus>;
   verifyWebhook(payload: string, signature: string): boolean;
   handleWebhook(payload: string, signature: string): Promise<WebhookPaymentResult>;
-  refund(id: string, amountCents?: number): Promise<void>;
+  refund(id: string, amountCents?: number, idempotencyKey?: string): Promise<{ providerRefundId: string }>;
 }
 
 export class StripePaymentProvider implements PaymentProvider {
@@ -68,6 +68,12 @@ export class StripePaymentProvider implements PaymentProvider {
   async handleWebhook(payload: string, signature: string): Promise<WebhookPaymentResult> {
     if (!process.env.STRIPE_WEBHOOK_SECRET) throw new Error("STRIPE_WEBHOOK_SECRET is required");
     const event = this.stripe.webhooks.constructEvent(payload, signature, process.env.STRIPE_WEBHOOK_SECRET);
+    if (["charge.dispute.created", "charge.dispute.updated", "charge.dispute.closed"].includes(event.type)) {
+      const dispute = event.data.object as Stripe.Dispute;
+      const status = event.type !== "charge.dispute.closed" ? "OPEN" : dispute.status === "won" ? "WON" : "LOST";
+      const providerPaymentId = typeof dispute.payment_intent === "string" ? dispute.payment_intent : typeof dispute.charge === "string" ? dispute.charge : "";
+      return { providerPaymentId, paymentId: "", status: null, dispute: { providerDisputeId: dispute.id, providerEventId: event.id, status, amountCents: dispute.amount, currency: dispute.currency.toUpperCase(), reason: dispute.reason || undefined } };
+    }
     if (!["checkout.session.completed", "checkout.session.async_payment_failed", "checkout.session.expired"].includes(event.type)) return { providerPaymentId: event.id, paymentId: "", status: null, ignored: true };
     const session = event.data.object as Stripe.Checkout.Session;
     const paymentId = session.metadata?.paymentId;
@@ -77,7 +83,10 @@ export class StripePaymentProvider implements PaymentProvider {
     return { providerPaymentId, paymentId, status };
   }
 
-  async refund(id: string, amountCents?: number) { await this.stripe.refunds.create({ payment_intent: id, ...(amountCents === undefined ? {} : { amount: amountCents }) }); }
+  async refund(id: string, amountCents?: number, idempotencyKey?: string) {
+    const refund = await this.stripe.refunds.create({ payment_intent: id, ...(amountCents === undefined ? {} : { amount: amountCents }) }, idempotencyKey ? { idempotencyKey } : undefined);
+    return { providerRefundId: refund.id };
+  }
 }
 
 export function paymentProvider(): PaymentProvider {
@@ -94,7 +103,7 @@ export async function markPaymentFromWebhook(input: { paymentId: string; provide
     if (input.connectedAccountId && payment.connectedAccountId && payment.connectedAccountId !== input.connectedAccountId) throw new Error("Connected account mismatch");
     if (payment.amount !== payment.order.totalCents || payment.currency !== payment.order.currency) throw new Error("Payment amount or currency mismatch");
 
-    const alreadyFinal = payment.status === "SUCCEEDED" || payment.status === "REFUNDED";
+    const alreadyFinal = payment.status === "SUCCEEDED" || payment.status === "REFUNDED" || payment.status === "PARTIALLY_REFUNDED" || payment.status === "DISPUTED";
     if (alreadyFinal && input.status !== payment.status) return payment;
     const updated = await tx.payment.update({ where: { id: payment.id }, data: { providerPaymentId: input.providerPaymentId, status: input.status, paidAt: input.status === "SUCCEEDED" ? payment.paidAt || new Date() : undefined }, include: { order: true } });
     if (input.status === "SUCCEEDED" && updated.order.status !== "PAID" && updated.order.status !== "REFUNDED") await tx.order.updateMany({ where: { id: payment.orderId, status: { in: ["PENDING_PAYMENT", "PAYMENT_FAILED"] } }, data: { status: "PAID" } });

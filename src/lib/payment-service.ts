@@ -3,6 +3,7 @@ import { calculatePlatformFeeCents, calculateProceedsCents, platformFeePerPhotoC
 import { isStripeConnectReady, syncStripeConnectAccount } from "./stripe-connect";
 import { paymentProvider, markPaymentFromWebhook } from "./payments";
 import { getAvailablePaymentMethods } from "./payment-settings";
+import { handleProviderDispute } from "./disputes";
 
 async function getOrCreatePayment(input: { orderId: string; provider: string; amount: number; currency: string; billablePhotoCount: number; platformFeePerPhotoCents: number; platformFeeCents: number; photographerProceedsCents: number; connectedAccountId?: string }) {
   const existing = await prisma.payment.findUnique({ where: { orderId: input.orderId } });
@@ -81,7 +82,11 @@ export async function processStripeWebhook(payload: string, signature: string) {
   if (event.processedAt) return;
   try {
     const result = await provider.handleWebhook(payload, signature);
-    if (result.status) await markPaymentFromWebhook({ paymentId: result.paymentId, providerPaymentId: result.providerPaymentId, status: result.status });
+    if (result.dispute) {
+      const payment = await prisma.payment.findFirst({ where: { provider: "STRIPE", OR: [{ providerPaymentId: result.providerPaymentId }, { providerChargeId: result.providerPaymentId }] } });
+      if (!payment) throw new Error("Dispute payment could not be reconciled");
+      await handleProviderDispute({ paymentId: payment.id, ...result.dispute });
+    } else if (result.status) await markPaymentFromWebhook({ paymentId: result.paymentId, providerPaymentId: result.providerPaymentId, status: result.status });
     await prisma.paymentWebhookEvent.update({ where: { id: event.id }, data: { processedAt: new Date(), lastError: null } });
   } catch (error) {
     await prisma.paymentWebhookEvent.update({ where: { id: event.id }, data: { lastError: error instanceof Error ? error.message : "Webhook processing failed" } });

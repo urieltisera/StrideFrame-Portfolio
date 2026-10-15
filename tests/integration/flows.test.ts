@@ -16,7 +16,7 @@ const suite = hasDatabase ? describe : describe.skip;
 
 suite("PostgreSQL critical flows", () => {
   beforeAll(async () => { await db.$connect(); });
-  beforeEach(async () => { await db.downloadGrant.deleteMany(); await db.orderItem.deleteMany(); await db.payment.deleteMany(); await db.order.deleteMany(); await db.photo.deleteMany(); await db.album.deleteMany(); await db.event.deleteMany(); await db.photographer.deleteMany(); });
+  beforeEach(async () => { await db.paymentDisputeEvent.deleteMany(); await db.paymentDispute.deleteMany(); await db.zelleFeeObligationReversal.deleteMany(); await db.refundItem.deleteMany(); await db.refund.deleteMany(); await db.zelleFeeObligation.deleteMany(); await db.downloadGrant.deleteMany(); await db.orderItem.deleteMany(); await db.payment.deleteMany(); await db.order.deleteMany(); await db.photo.deleteMany(); await db.album.deleteMany(); await db.event.deleteMany(); await db.photographer.deleteMany(); });
   afterAll(async () => { await db.$disconnect(); });
 
   it("persists registration, rejects duplicate email, and verifies login", async () => {

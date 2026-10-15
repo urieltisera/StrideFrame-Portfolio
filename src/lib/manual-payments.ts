@@ -66,6 +66,6 @@ async function decideManualPayment(input: { photographerId: string; orderId: str
 }
 
 export async function getZelleFeeSummary(photographerId: string) {
-  const obligations = await prisma.zelleFeeObligation.findMany({ where: { photographerId, status: { in: ["OPEN", "ROLLED_FORWARD", "INVOICED"] } }, select: { amountCents: true, currency: true, status: true } });
-  return { amountCents: obligations.reduce((sum, obligation) => sum + obligation.amountCents, 0), currency: obligations[0]?.currency || "USD", count: obligations.length, statuses: obligations.map((obligation) => obligation.status) };
+  const obligations = await prisma.zelleFeeObligation.findMany({ where: { photographerId, status: { in: ["OPEN", "ROLLED_FORWARD", "INVOICED"] } }, select: { amountCents: true, currency: true, status: true, reversals: { select: { amountCents: true } } } });
+  return { amountCents: obligations.reduce((sum, obligation) => sum + obligation.amountCents - obligation.reversals.reduce((reversed, item) => reversed + item.amountCents, 0), 0), currency: obligations[0]?.currency || "USD", count: obligations.length, statuses: obligations.map((obligation) => obligation.status) };
 }

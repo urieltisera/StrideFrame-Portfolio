@@ -19,6 +19,8 @@ enum OrderStatus {
   PAYMENT_FAILED
   CANCELLED
   REFUNDED
+  PARTIALLY_REFUNDED
+  PAYMENT_DISPUTED
 }
 
 enum PaymentStatus {
@@ -28,6 +30,23 @@ enum PaymentStatus {
   FAILED
   CANCELLED
   REFUNDED
+  PARTIALLY_REFUNDED
+  DISPUTED
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCEEDED
+  MANUAL_PENDING
+  MANUAL_COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum DisputeStatus {
+  OPEN
+  WON
+  LOST
 }
 
 enum StripeConnectStatus {
@@ -74,12 +93,12 @@ enum ZelleFeeSettlementStatus {
 }
 
 model Photographer {
-  id                   String                @id @default(cuid())
-  email                String                @unique
+  id                   String                       @id @default(cuid())
+  email                String                       @unique
   name                 String
   passwordHash         String
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
   events               Event[]
   albums               Album[]
   qrLinks              QRLink[]
@@ -93,18 +112,18 @@ model Photographer {
 }
 
 model PhotographerPaymentSettings {
-  id                       String       @id @default(cuid())
-  photographerId           String       @unique
-  photographer             Photographer @relation(fields: [photographerId], references: [id], onDelete: Cascade)
-  stripeEnabled            Boolean      @default(true)
-  zelleEnabled             Boolean      @default(false)
-  zelleDisplayName         String?
-  zellePaymentIdentifier   String?
-  zelleInstructions        String?
-  zelleQrKey               String?      @unique
-  zelleQrContentType       String?
-  createdAt                DateTime     @default(now())
-  updatedAt                DateTime     @updatedAt
+  id                     String       @id @default(cuid())
+  photographerId         String       @unique
+  photographer           Photographer @relation(fields: [photographerId], references: [id], onDelete: Cascade)
+  stripeEnabled          Boolean      @default(true)
+  zelleEnabled           Boolean      @default(false)
+  zelleDisplayName       String?
+  zellePaymentIdentifier String?
+  zelleInstructions      String?
+  zelleQrKey             String?      @unique
+  zelleQrContentType     String?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
 }
 
 model StripeConnectAccount {
@@ -235,87 +254,93 @@ model FaceIndexJob {
 }
 
 model Order {
-  id                String          @id @default(cuid())
-  publicOrderCode   String          @unique
-  eventId           String
-  event             Event           @relation(fields: [eventId], references: [id])
-  photographerId    String
-  photographer      Photographer    @relation(fields: [photographerId], references: [id])
-  customerEmail     String
-  customerFirstName String?
-  customerLastName  String?
-  currency          String          @default("USD")
-  subtotalCents     Int
-  totalCents        Int
-  status            OrderStatus     @default(PENDING_PAYMENT)
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  items             OrderItem[]
-  payment           Payment?
-  grants            DownloadGrant[]
+  id                  String               @id @default(cuid())
+  publicOrderCode     String               @unique
+  eventId             String
+  event               Event                @relation(fields: [eventId], references: [id])
+  photographerId      String
+  photographer        Photographer         @relation(fields: [photographerId], references: [id])
+  customerEmail       String
+  customerFirstName   String?
+  customerLastName    String?
+  currency            String               @default("USD")
+  subtotalCents       Int
+  totalCents          Int
+  status              OrderStatus          @default(PENDING_PAYMENT)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  items               OrderItem[]
+  payment             Payment?
+  grants              DownloadGrant[]
   manualPaymentAudits ManualPaymentAudit[]
-  zelleFeeObligation ZelleFeeObligation?
+  zelleFeeObligation  ZelleFeeObligation?
+  refunds             Refund[]
+  disputes            PaymentDispute[]
 
   @@index([photographerId, status])
   @@index([customerEmail])
 }
 
 model OrderItem {
-  id               String   @id @default(cuid())
+  id               String      @id @default(cuid())
   orderId          String
-  order            Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order            Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   photoId          String
-  photo            Photo    @relation(fields: [photoId], references: [id])
+  photo            Photo       @relation(fields: [photoId], references: [id])
   unitPriceCents   Int
-  currency         String   @default("USD")
+  currency         String      @default("USD")
   originalFilename String?
-  createdAt        DateTime @default(now())
+  refundedAt       DateTime?
+  createdAt        DateTime    @default(now())
+  refundItem       RefundItem?
 
   @@unique([orderId, photoId])
 }
 
 model Payment {
-  id                        String        @id @default(cuid())
-  orderId                   String        @unique
-  order                     Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id                        String               @id @default(cuid())
+  orderId                   String               @unique
+  order                     Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
   provider                  String
   providerPaymentId         String?
   providerCheckoutId        String?
   amount                    Int
-  currency                  String        @default("USD")
-  platformFeeCents          Int           @default(0)
-  photographerProceedsCents Int           @default(0)
-  billablePhotoCount        Int           @default(0)
-  platformFeePerPhotoCents  Int           @default(25)
+  currency                  String               @default("USD")
+  platformFeeCents          Int                  @default(0)
+  photographerProceedsCents Int                  @default(0)
+  billablePhotoCount        Int                  @default(0)
+  platformFeePerPhotoCents  Int                  @default(25)
   connectedAccountId        String?
   providerChargeId          String?
   providerApplicationFeeId  String?
-  status                    PaymentStatus @default(PENDING)
-  idempotencyKey            String        @unique
+  status                    PaymentStatus        @default(PENDING)
+  idempotencyKey            String               @unique
   rawResponse               Json?
   manualAudits              ManualPaymentAudit[]
   zelleFeeObligation        ZelleFeeObligation?
-  createdAt                 DateTime      @default(now())
-  updatedAt                 DateTime      @updatedAt
+  refunds                   Refund[]
+  disputes                  PaymentDispute[]
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
   paidAt                    DateTime?
 }
 
 model ManualPaymentAudit {
-  id                   String              @id @default(cuid())
-  orderId              String
-  order                Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  paymentId            String
-  payment              Payment             @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  photographerId       String
-  photographer         Photographer        @relation(fields: [photographerId], references: [id], onDelete: Cascade)
-  provider             String
-  action               ManualPaymentAction
-  previousOrderStatus  OrderStatus
-  resultingOrderStatus OrderStatus
-  previousPaymentStatus PaymentStatus
+  id                     String              @id @default(cuid())
+  orderId                String
+  order                  Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentId              String
+  payment                Payment             @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  photographerId         String
+  photographer           Photographer        @relation(fields: [photographerId], references: [id], onDelete: Cascade)
+  provider               String
+  action                 ManualPaymentAction
+  previousOrderStatus    OrderStatus
+  resultingOrderStatus   OrderStatus
+  previousPaymentStatus  PaymentStatus
   resultingPaymentStatus PaymentStatus
-  note                 String?
-  createdAt            DateTime            @default(now())
+  note                   String?
+  createdAt              DateTime            @default(now())
 
   @@unique([paymentId, action])
   @@index([photographerId, action, createdAt])
@@ -323,26 +348,109 @@ model ManualPaymentAudit {
 }
 
 model ZelleFeeObligation {
-  id                 String                  @id @default(cuid())
+  id                 String                       @id @default(cuid())
   photographerId     String
-  photographer       Photographer            @relation(fields: [photographerId], references: [id], onDelete: Restrict)
-  orderId            String                  @unique
-  order              Order                   @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  paymentId          String                  @unique
-  payment            Payment                 @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  photographer       Photographer                 @relation(fields: [photographerId], references: [id], onDelete: Restrict)
+  orderId            String                       @unique
+  order              Order                        @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  paymentId          String                       @unique
+  payment            Payment                      @relation(fields: [paymentId], references: [id], onDelete: Restrict)
   billablePhotoCount Int
   feePerPhotoCents   Int
   amountCents        Int
-  currency           String                  @default("USD")
-  status             ZelleFeeSettlementStatus @default(OPEN)
-  earnedAt           DateTime                @default(now())
+  currency           String                       @default("USD")
+  status             ZelleFeeSettlementStatus     @default(OPEN)
+  earnedAt           DateTime                     @default(now())
   settledAt          DateTime?
   voidedAt           DateTime?
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+  reversals          ZelleFeeObligationReversal[]
 
   @@index([photographerId, status, earnedAt])
   @@index([status, earnedAt])
+}
+
+model Refund {
+  id                       String                      @id @default(cuid())
+  orderId                  String
+  order                    Order                       @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  paymentId                String
+  payment                  Payment                     @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  provider                 String
+  amountCents              Int
+  platformFeeReversalCents Int
+  currency                 String                      @default("USD")
+  status                   RefundStatus                @default(PENDING)
+  reason                   String?
+  providerRefundId         String?                     @unique
+  idempotencyKey           String                      @unique
+  source                   String
+  actorId                  String?
+  createdAt                DateTime                    @default(now())
+  completedAt              DateTime?
+  items                    RefundItem[]
+  zelleFeeReversal         ZelleFeeObligationReversal?
+
+  @@index([orderId, status, createdAt])
+  @@index([paymentId, status, createdAt])
+}
+
+model RefundItem {
+  id                       String    @id @default(cuid())
+  refundId                 String
+  refund                   Refund    @relation(fields: [refundId], references: [id], onDelete: Cascade)
+  orderItemId              String    @unique
+  orderItem                OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  amountCents              Int
+  platformFeeReversalCents Int
+  createdAt                DateTime  @default(now())
+
+  @@index([refundId])
+}
+
+model ZelleFeeObligationReversal {
+  id                 String             @id @default(cuid())
+  obligationId       String
+  obligation         ZelleFeeObligation @relation(fields: [obligationId], references: [id], onDelete: Restrict)
+  refundId           String             @unique
+  refund             Refund             @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  billablePhotoCount Int
+  amountCents        Int
+  currency           String             @default("USD")
+  createdAt          DateTime           @default(now())
+
+  @@index([obligationId, createdAt])
+}
+
+model PaymentDispute {
+  id                String                @id @default(cuid())
+  paymentId         String
+  payment           Payment               @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  orderId           String
+  order             Order                 @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  providerDisputeId String                @unique
+  amountCents       Int
+  currency          String                @default("USD")
+  status            DisputeStatus
+  reason            String?
+  openedAt          DateTime              @default(now())
+  resolvedAt        DateTime?
+  events            PaymentDisputeEvent[]
+
+  @@index([paymentId, status, openedAt])
+  @@index([orderId, status, openedAt])
+}
+
+model PaymentDisputeEvent {
+  id              String         @id @default(cuid())
+  disputeId       String
+  dispute         PaymentDispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  providerEventId String         @unique
+  status          DisputeStatus
+  createdAt       DateTime       @default(now())
+
+  @@index([disputeId, createdAt])
 }
 
 model PaymentWebhookEvent {

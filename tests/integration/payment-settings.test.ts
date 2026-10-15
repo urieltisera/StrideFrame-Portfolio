@@ -11,6 +11,11 @@ const hasDatabase = Boolean(process.env.TEST_DATABASE_URL);
 
 describe.skipIf(!hasDatabase)("photographer payment settings and Zelle boundary", () => {
   beforeEach(async () => {
+    await db.paymentDisputeEvent.deleteMany();
+    await db.paymentDispute.deleteMany();
+    await db.zelleFeeObligationReversal.deleteMany();
+    await db.refundItem.deleteMany();
+    await db.refund.deleteMany();
     await db.downloadGrant.deleteMany();
     await db.zelleFeeObligation.deleteMany();
     await db.orderItem.deleteMany();
