@@ -221,20 +221,27 @@ model Photo {
 }
 
 model PhotoFace {
-  id                  String                     @id @default(cuid())
-  photoId             String
-  photo               Photo                      @relation(fields: [photoId], references: [id], onDelete: Cascade)
-  eventId             String
-  albumId             String
-  embedding           Unsupported("vector(512)")
-  detectionConfidence Float
-  boundingBox         Json
-  modelVersion        String
-  createdAt           DateTime                   @default(now())
+  id                    String                     @id @default(cuid())
+  photoId               String
+  photo                 Photo                      @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  eventId               String
+  albumId               String
+  embedding             Unsupported("vector(512)")
+  detectionConfidence   Float
+  boundingBox           Json
+  faceIndex             Int
+  providerId            String
+  modelId               String
+  modelVersion          String
+  embeddingFormatVersion String
+  embeddingDimension    Int
+  similarityMetric      String
+  compatibilityKey      String
+  createdAt             DateTime                   @default(now())
 
-  @@unique([photoId, modelVersion])
-  @@index([eventId, modelVersion])
-  @@index([photoId, modelVersion])
+  @@unique([photoId, compatibilityKey, faceIndex])
+  @@index([eventId, compatibilityKey])
+  @@index([photoId, compatibilityKey])
 }
 
 model FaceIndexJob {
