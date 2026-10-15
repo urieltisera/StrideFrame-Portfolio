@@ -5,7 +5,14 @@ import {
   getFaceSearchAvailability,
   requireFaceProvider,
 } from "@/lib/face-provider";
-import { searchEventFaces, validateSelfie } from "@/lib/face-search";
+import { customerFaceSearchError, hasFaceSearchConsent, searchEventFaces, validateSelfie } from "@/lib/face-search";
+import {
+  consumeFaceSearchRateLimit,
+  FACE_SEARCH_RATE_LIMITED_MESSAGE,
+  FACE_SEARCH_TEMPORARY_MESSAGE,
+  tryAcquireFaceSearchInference,
+  withFaceSearchTimeout,
+} from "@/lib/face-security";
 
 export async function GET() {
   const availability = getFaceSearchAvailability();
@@ -13,21 +20,49 @@ export async function GET() {
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ eventSlug: string }> }) {
+  const { eventSlug } = await params;
+  const rateLimit = consumeFaceSearchRateLimit(request, eventSlug);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: FACE_SEARCH_RATE_LIMITED_MESSAGE, code: "FACE_SEARCH_RATE_LIMITED" },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
+    );
+  }
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return NextResponse.json({ error: "Please upload a valid image or browse the gallery.", code: "FACE_SEARCH_INPUT_INVALID" }, { status: 400 });
+  }
+  if (!hasFaceSearchConsent(form)) {
+    return NextResponse.json({ error: "Please acknowledge the Face Search privacy notice before continuing.", code: "FACE_SEARCH_CONSENT_REQUIRED" }, { status: 400 });
+  }
   const availability = getFaceSearchAvailability();
   if (!availability.available) {
     return NextResponse.json({ error: FACE_SEARCH_UNAVAILABLE_MESSAGE, code: "FACE_SEARCH_UNAVAILABLE" }, { status: 503 });
   }
+  const releaseInference = tryAcquireFaceSearchInference();
+  if (!releaseInference) {
+    return NextResponse.json(
+      { error: FACE_SEARCH_TEMPORARY_MESSAGE, code: "FACE_SEARCH_BUSY" },
+      { status: 503, headers: { "Retry-After": "1" } },
+    );
+  }
+  let providerWork: Promise<Array<{ id: string; photoId: string; distance: number }>> | undefined;
   try {
-    const { eventSlug } = await params;
     const event = await prisma.event.findFirst({ where: { slug: eventSlug, status: "PUBLISHED" }, select: { id: true } });
     if (!event) return new NextResponse("Not found", { status: 404 });
-    const form = await request.formData();
     const file = form.get("selfie");
     if (!(file instanceof File)) return NextResponse.json({ error: "Please upload a selfie" }, { status: 400 });
-    const provider = requireFaceProvider();
-    const validated = await validateSelfie(file);
-    const embedding = await provider.generateEmbedding(validated.face);
-    const matches = await searchEventFaces(event.id, embedding);
+    providerWork = (async () => {
+      const provider = requireFaceProvider();
+      const validated = await validateSelfie(file);
+      const embedding = await provider.generateEmbedding(validated.face);
+      const matches = await searchEventFaces(event.id, embedding);
+      return matches;
+    })();
+    const result = await withFaceSearchTimeout(providerWork);
+    const matches = result;
     const best = new Map<string, number>();
     for (const match of matches) best.set(match.photoId, Math.max(best.get(match.photoId) || 0, Number(match.distance)));
     const photos = await prisma.photo.findMany({
@@ -37,6 +72,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ eve
     return NextResponse.json({ results: photos.map((photo) => ({ ...photo, previewUrl: `/api/previews/${photo.previewKey}`, score: best.get(photo.id) })) });
   } catch (error) {
     if (error instanceof Error && error.name === "FaceSearchUnavailableError") return NextResponse.json({ error: FACE_SEARCH_UNAVAILABLE_MESSAGE, code: "FACE_SEARCH_UNAVAILABLE" }, { status: 503 });
-    return NextResponse.json({ error: error instanceof Error && error.message.startsWith("Unsupported selfie") ? error.message : "Face search could not be completed." }, { status: 400 });
+    if (error instanceof Error && error.message === "Face search processing timed out") return NextResponse.json({ error: FACE_SEARCH_TEMPORARY_MESSAGE, code: "FACE_SEARCH_TEMPORARY_FAILURE" }, { status: 503, headers: { "Retry-After": "1" } });
+    return NextResponse.json({ error: customerFaceSearchError(error), code: "FACE_SEARCH_INPUT_INVALID" }, { status: 400 });
+  } finally {
+    if (providerWork) {
+      void providerWork.then(releaseInference, releaseInference);
+    } else {
+      releaseInference();
+    }
   }
 }

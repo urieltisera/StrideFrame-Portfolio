@@ -1,8 +1,28 @@
 import crypto from "node:crypto";
+import sharp from "sharp";
 import { prisma } from "./prisma";
 import { createStorageProvider } from "./storage-factory";
 import { assertEmbeddingCompatible, assertPersistedEmbeddingCompatible, faceCompatibilityKey, requireFaceProvider } from "./face-provider";
-import { FACE_MATCH_LIMIT, FACE_MATCH_THRESHOLD, FACE_SELFIE_MAX_BYTES } from "./face-config";
+import { FACE_MATCH_LIMIT, FACE_MATCH_THRESHOLD, FACE_SELFIE_MAX_BYTES, FACE_SELFIE_MAX_DIMENSION, FACE_SELFIE_MAX_PIXELS } from "./face-config";
+
+export const FACE_SEARCH_CONSENT_FIELD = "faceSearchConsent";
+export const FACE_SEARCH_CONSENT_VALUE = "accepted";
+
+export function hasFaceSearchConsent(form: FormData) {
+  const values = form.getAll(FACE_SEARCH_CONSENT_FIELD);
+  return values.length === 1 && values[0] === FACE_SEARCH_CONSENT_VALUE;
+}
+
+export function customerFaceSearchError(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (message === "No face found") return "We couldn't detect a face in that photo. Try another photo or browse the gallery.";
+  if (message.includes("one clear face")) return "Please use a photo containing only your face, or browse the gallery.";
+  if (message === "Unsupported selfie type" || message === "Unsupported selfie extension") return "Please upload a JPG, PNG, or WebP image.";
+  if (message === "Selfie exceeds the allowed size") return "That image is too large. Please choose an image under 5 MB.";
+  if (message === "Selfie dimensions exceed the allowed limit") return "That image is too large to process. Please choose a smaller photo.";
+  if (message === "Malformed selfie image") return "That image could not be read. Please try another photo or browse the gallery.";
+  return "Face search could not be completed. Please try again or browse the gallery.";
+}
 
 function vectorLiteral(values: number[], dimension: number) {
   if (values.length !== dimension || values.some((value) => !Number.isFinite(value))) throw new Error("Invalid face embedding");
@@ -64,9 +84,26 @@ export async function searchEventFaces(eventId: string, embedding: number[], alb
 
 export async function validateSelfie(file: File) {
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) throw new Error("Unsupported selfie type");
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  const extensionsByMime: Record<string, string[]> = { "image/jpeg": ["jpg", "jpeg"], "image/png": ["png"], "image/webp": ["webp"] };
+  if (extension && !extensionsByMime[file.type].includes(extension)) throw new Error("Unsupported selfie extension");
   if (file.size <= 0 || file.size > FACE_SELFIE_MAX_BYTES) throw new Error("Selfie exceeds the allowed size");
   const bytes = Buffer.from(await file.arrayBuffer());
+  if (bytes.length <= 0 || bytes.length > FACE_SELFIE_MAX_BYTES) throw new Error("Selfie exceeds the allowed size");
   const provider = requireFaceProvider();
+  const isDevelopmentFixture = provider.metadata.providerId === "deterministic" && process.env.NODE_ENV !== "production" && /NO_FACE|MULTI_FACE|THREE_FACE/.test(bytes.toString("utf8"));
+  if (!isDevelopmentFixture) {
+    try {
+      const image = sharp(bytes);
+      const metadata = await image.metadata();
+      if (!metadata.width || !metadata.height) throw new Error("invalid dimensions");
+      if (metadata.width > FACE_SELFIE_MAX_DIMENSION || metadata.height > FACE_SELFIE_MAX_DIMENSION || metadata.width * metadata.height > FACE_SELFIE_MAX_PIXELS) throw new Error("Selfie dimensions exceed the allowed limit");
+      await image.resize({ width: 1, height: 1, fit: "inside" }).raw().toBuffer();
+    } catch (error) {
+      if (error instanceof Error && error.message === "Selfie dimensions exceed the allowed limit") throw error;
+      throw new Error("Malformed selfie image");
+    }
+  }
   const faces = await provider.detectFaces(bytes);
   if (faces.length !== 1) throw new Error(faces.length === 0 ? "No face found" : "Please upload a selfie with one clear face");
   return { bytes, face: faces[0] };

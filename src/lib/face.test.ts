@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import sharp from "sharp";
 import { assertEmbeddingCompatible, DeterministicFaceProvider, faceCompatibilityKey, faceProvider, getFaceSearchAvailability, requireFaceProvider } from "./face-provider";
-import { validateSelfie } from "./face-search";
+import { FACE_SEARCH_CONSENT_FIELD, FACE_SEARCH_CONSENT_VALUE, hasFaceSearchConsent, validateSelfie } from "./face-search";
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -19,6 +20,31 @@ describe("face provider boundary", () => {
     await expect(validateSelfie(new File(["x"], "selfie.txt", { type: "text/plain" }))).rejects.toThrow("Unsupported");
     await expect(validateSelfie(new File(["NO_FACE"], "selfie.jpg", { type: "image/jpeg" }))).rejects.toThrow("No face");
     await expect(validateSelfie(new File(["MULTI_FACE"], "selfie.jpg", { type: "image/jpeg" }))).rejects.toThrow("one clear face");
+  });
+
+  it("requires explicit Face Search consent and does not treat a generic form as consent", () => {
+    expect(hasFaceSearchConsent(new FormData())).toBe(false);
+    const consent = new FormData();
+    consent.set(FACE_SEARCH_CONSENT_FIELD, FACE_SEARCH_CONSENT_VALUE);
+    expect(hasFaceSearchConsent(consent)).toBe(true);
+    consent.set(FACE_SEARCH_CONSENT_FIELD, "terms-accepted");
+    expect(hasFaceSearchConsent(consent)).toBe(false);
+    consent.set(FACE_SEARCH_CONSENT_FIELD, "true");
+    expect(hasFaceSearchConsent(consent)).toBe(false);
+    consent.set(FACE_SEARCH_CONSENT_FIELD, FACE_SEARCH_CONSENT_VALUE);
+    consent.append(FACE_SEARCH_CONSENT_FIELD, "unexpected");
+    expect(hasFaceSearchConsent(consent)).toBe(false);
+  });
+
+  it("rejects empty, malformed, and extension-mismatched query images", async () => {
+    await expect(validateSelfie(new File([], "selfie.jpg", { type: "image/jpeg" }))).rejects.toThrow("allowed size");
+    await expect(validateSelfie(new File(["not an image"], "selfie.jpg", { type: "image/jpeg" }))).rejects.toThrow("Malformed");
+    await expect(validateSelfie(new File(["NO_FACE"], "selfie.png", { type: "image/jpeg" }))).rejects.toThrow("extension");
+  });
+
+  it("rejects decoded dimensions before face inference", async () => {
+    const oversized = await sharp({ create: { width: 6001, height: 1, channels: 3, background: "white" } }).png().toBuffer();
+    await expect(validateSelfie(new File([oversized], "selfie.png", { type: "image/png" }))).rejects.toThrow("dimensions");
   });
 
   it("keeps deterministic and ONNX providers development-only", () => {
