@@ -3,6 +3,9 @@ import { PrismaClient } from "@prisma/client";
 import crypto from "node:crypto";
 import { DeterministicFaceProvider, faceCompatibilityKey } from "../../src/lib/face-provider";
 import { searchEventFaces } from "../../src/lib/face-search";
+import { deleteEventWithAssets, findFaceLifecycleIssues, removeStaleFaceDerivatives } from "../../src/lib/face-lifecycle";
+import { deletePhoto } from "../../src/lib/photos";
+import type { StorageProvider } from "../../src/lib/storage";
 
 const db = new PrismaClient();
 const suite = process.env.TEST_DATABASE_URL ? describe : describe.skip;
@@ -79,10 +82,49 @@ suite("persisted Face Search metadata and multi-face semantics", () => {
     expect(await db.photoFace.count({ where: { photoId: photoA.id, compatibilityKey: faceCompatibilityKey(metadata) } })).toBe(2);
     await replaceFaces(photoA.id, eventA.id, albumA.id, threeFaces.slice(0, 2));
     expect(await db.photoFace.count({ where: { photoId: photoA.id, compatibilityKey: faceCompatibilityKey(metadata) } })).toBe(2);
+    await replaceFaces(photoA.id, eventA.id, albumA.id, [threeFaces[0]], "old-provider|old-model|v0|legacy|512|COSINE", {
+      providerId: "old-provider", modelId: "old-model", modelVersion: "v0", embeddingFormatVersion: "legacy", embeddingDimension: 512, similarityMetric: "COSINE", readinessClass: "DEV_VALIDATION_ONLY",
+    });
+    await removeStaleFaceDerivatives(photoA.id, faceCompatibilityKey(metadata));
+    expect(await db.photoFace.count({ where: { photoId: photoA.id } })).toBe(2);
 
-    await db.photo.delete({ where: { id: photoA.id } });
+    const files: StorageProvider = {
+      putOriginal: async () => undefined,
+      putPreview: async () => undefined,
+      deleteOriginal: async () => undefined,
+      deletePreview: async () => undefined,
+      getProtectedOriginal: async () => Buffer.from(""),
+      getPublicPreviewUrl: (key) => `/preview/${key}`,
+      putAsset: async () => undefined,
+      deleteAsset: async () => undefined,
+      getAsset: async () => Buffer.from(""),
+    };
+    await deletePhoto(photoA.id, owner.id, files);
     expect(await db.photoFace.count({ where: { photoId: photoA.id } })).toBe(0);
-    await db.event.delete({ where: { id: eventB.id } });
+    await deleteEventWithAssets(eventB.id, owner.id, files);
     expect(await db.photoFace.count({ where: { eventId: eventB.id } })).toBe(0);
+    expect(await findFaceLifecycleIssues()).toHaveLength(0);
+  });
+
+  it("revokes biometric searchability even when external storage cleanup fails", async () => {
+    const owner = await db.photographer.create({ data: { email: "face-cleanup@example.com", name: "Cleanup", passwordHash: "x" } });
+    const event = await db.event.create({ data: { photographerId: owner.id, title: "Cleanup Event", slug: "face-cleanup", accessCode: "face-cleanup", status: "PUBLISHED" } });
+    const album = await db.album.create({ data: { photographerId: owner.id, eventId: event.id, title: "Cleanup", slug: "cleanup", status: "PUBLISHED" } });
+    const photo = await createPhoto(album.id, "photo-cleanup");
+    const faces = await provider.detectFaces(Buffer.from("cleanup"));
+    await replaceFaces(photo.id, event.id, album.id, [faces[0]]);
+    const failingStorage: StorageProvider = {
+      putOriginal: async () => undefined,
+      putPreview: async () => undefined,
+      deleteOriginal: async () => { throw new Error("storage unavailable"); },
+      deletePreview: async () => { throw new Error("storage unavailable"); },
+      getProtectedOriginal: async () => Buffer.from(""),
+      getPublicPreviewUrl: (key) => `/preview/${key}`,
+      putAsset: async () => undefined,
+      deleteAsset: async () => undefined,
+      getAsset: async () => Buffer.from(""),
+    };
+    await expect(deletePhoto(photo.id, owner.id, failingStorage)).rejects.toThrow("revoked");
+    expect(await db.photoFace.count({ where: { photoId: photo.id } })).toBe(0);
   });
 });

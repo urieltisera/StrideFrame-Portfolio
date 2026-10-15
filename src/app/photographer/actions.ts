@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { createSession, destroySession, getCurrentPhotographer } from "@/lib/auth";
 import { normalizeSlug } from "@/lib/slugs";
 import { createPhoto, deletePhoto, MAX_PHOTOS_PER_UPLOAD } from "@/lib/photos";
+import { deleteEventWithAssets } from "@/lib/face-lifecycle";
 import { dollarsToCents } from "@/lib/money";
 import { newQrCode } from "@/lib/qr";
 
@@ -20,7 +21,7 @@ export async function createEvent(formData: FormData) { const person=await owner
 export async function updateEvent(formData: FormData) { const person=await owner(); const id=String(formData.get("id")); const parsed=eventInput.safeParse(Object.fromEntries(formData)); if (!parsed.success) redirect(`/photographer/events/${id}?error=invalid`); const result=await prisma.event.updateMany({where:{id,photographerId:person.id},data:parsed.data}); if (result.count!==1) redirect("/photographer/dashboard?error=not-found"); redirect(`/photographer/events/${id}`); }
 export async function publishEvent(formData: FormData) { const person=await owner(); const id=String(formData.get("id")); await prisma.event.updateMany({where:{id,photographerId:person.id},data:{status:"PUBLISHED"}}); redirect(`/photographer/events/${id}`); }
 export async function unpublishEvent(formData: FormData) { const person=await owner(); const id=String(formData.get("id")); await prisma.event.updateMany({where:{id,photographerId:person.id},data:{status:"DRAFT"}}); redirect(`/photographer/events/${id}`); }
-export async function deleteEvent(formData: FormData) { const person=await owner(); const id=String(formData.get("id")); await prisma.event.deleteMany({where:{id,photographerId:person.id}}); redirect("/photographer/dashboard"); }
+export async function deleteEvent(formData: FormData) { const person=await owner(); const id=String(formData.get("id")); try { await deleteEventWithAssets(id, person.id); } catch { redirect("/photographer/dashboard?error=event-delete"); } redirect("/photographer/dashboard"); }
 export async function createAlbum(formData: FormData) { const person=await owner(); const eventId=String(formData.get("eventId")); const parsed=albumInput.safeParse(Object.fromEntries(formData)); const event=await prisma.event.findFirst({where:{id:eventId,photographerId:person.id}}); if (!event || !parsed.success) redirect(`/photographer/events/${eventId}?error=invalid`); await prisma.album.create({data:{...parsed.data,eventId,photographerId:person.id}}); redirect(`/photographer/events/${eventId}`); }
 export async function updateAlbum(formData: FormData) { const person=await owner(); const id=String(formData.get("id")); const parsed=albumInput.safeParse(Object.fromEntries(formData)); const album=await prisma.album.findFirst({where:{id,photographerId:person.id}}); if (!album || !parsed.success) redirect(`/photographer/events/${album?.eventId ?? ""}?error=invalid`); await prisma.album.update({where:{id},data:parsed.data}); redirect(`/photographer/events/${album.eventId}`); }
 export async function deleteAlbum(formData: FormData) { const person=await owner(); const id=String(formData.get("id")); const album=await prisma.album.findFirst({where:{id,photographerId:person.id}}); if (album) await prisma.album.delete({where:{id}}); redirect(`/photographer/events/${album?.eventId ?? ""}`); }

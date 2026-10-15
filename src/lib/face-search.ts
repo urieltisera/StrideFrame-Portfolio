@@ -52,6 +52,7 @@ export async function processFaceIndexJob(jobId: string) {
         id, job.photoId, job.photo.album.eventId, job.photo.albumId, literal, face.confidence, JSON.stringify(face.boundingBox), faceIndex, provider.metadata.providerId, provider.metadata.modelId, provider.metadata.modelVersion, provider.metadata.embeddingFormatVersion, provider.metadata.embeddingDimension, provider.metadata.similarityMetric, compatibilityKey,
       );
     }
+    await tx.$executeRaw`DELETE FROM "PhotoFace" WHERE "photoId"=${job.photoId} AND "compatibilityKey" <> ${compatibilityKey}`;
     await tx.faceIndexJob.update({ where: { id: jobId }, data: { status: "COMPLETED", completedAt: new Date(), lastError: null } });
   });
   return faces.length;
