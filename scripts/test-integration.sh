@@ -9,4 +9,4 @@ if command -v docker >/dev/null 2>&1 && docker compose ps -q db >/dev/null 2>&1;
 fi
 
 DATABASE_URL="$TEST_DATABASE_URL" npx prisma migrate deploy
-DATABASE_URL="$TEST_DATABASE_URL" TEST_DATABASE_URL="$TEST_DATABASE_URL" vitest run tests/integration
+DATABASE_URL="$TEST_DATABASE_URL" TEST_DATABASE_URL="$TEST_DATABASE_URL" vitest run tests/integration --no-file-parallelism

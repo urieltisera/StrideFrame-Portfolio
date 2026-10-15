@@ -3,12 +3,12 @@ import type { ReactNode } from "react";
 
 type PhotographerShellProps = {
   children: ReactNode;
-  active?: "dashboard" | "events";
+  active?: "dashboard" | "events" | "settings";
   accountName?: string;
 };
 
 export function PhotographerShell({ children, active = "dashboard", accountName }: PhotographerShellProps) {
-  const navItem = (item: "dashboard" | "events") =>
+  const navItem = (item: "dashboard" | "events" | "settings") =>
     `flex items-center gap-3 rounded-[var(--radius-medium)] px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
       active === item
         ? "bg-white/12 text-white"
@@ -27,6 +27,7 @@ export function PhotographerShell({ children, active = "dashboard", accountName 
           <Link className={navItem("events")} href="/photographer/dashboard#events"><span aria-hidden="true">◫</span>Events</Link>
           <Link className="flex items-center gap-3 rounded-[var(--radius-medium)] px-3 py-2.5 text-sm font-semibold text-white/60 hover:bg-white/8 hover:text-white" href="/photographer/dashboard#events"><span aria-hidden="true">▧</span>Photos</Link>
           <Link className="flex items-center gap-3 rounded-[var(--radius-medium)] px-3 py-2.5 text-sm font-semibold text-white/60 hover:bg-white/8 hover:text-white" href="/photographer/dashboard#events"><span aria-hidden="true">◌</span>Orders</Link>
+          <Link className={navItem("settings")} href="/photographer/settings/payments"><span aria-hidden="true">⚙</span>Payment settings</Link>
         </nav>
         <div className="mt-auto border-t border-white/10 pt-5">
           <p className="text-xs text-white/45">Signed in as</p>
@@ -39,6 +40,7 @@ export function PhotographerShell({ children, active = "dashboard", accountName 
           <nav aria-label="Photographer mobile navigation" className="flex gap-1 text-xs">
             <Link className={navItem("dashboard")} href="/photographer/dashboard">Dashboard</Link>
             <Link className={navItem("events")} href="/photographer/dashboard#events">Events</Link>
+            <Link className={navItem("settings")} href="/photographer/settings/payments">Payments</Link>
           </nav>
         </div>
       </div>

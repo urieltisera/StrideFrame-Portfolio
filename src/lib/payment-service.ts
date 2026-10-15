@@ -2,17 +2,19 @@ import { prisma } from "./prisma";
 import { calculatePlatformFeeCents, calculateProceedsCents } from "./commission";
 import { isStripeConnectReady, syncStripeConnectAccount } from "./stripe-connect";
 import { paymentProvider, markPaymentFromWebhook } from "./payments";
+import { getAvailablePaymentMethods, getOrCreatePaymentSettings } from "./payment-settings";
 
-async function getOrCreatePayment(input: { orderId: string; amount: number; currency: string; platformFeeCents: number; photographerProceedsCents: number; connectedAccountId: string }) {
+async function getOrCreatePayment(input: { orderId: string; provider: string; amount: number; currency: string; platformFeeCents: number; photographerProceedsCents: number; connectedAccountId?: string }) {
   const existing = await prisma.payment.findUnique({ where: { orderId: input.orderId } });
   if (existing) {
     if (existing.status !== "PENDING") throw new Error("Payment is no longer payable");
+    if (existing.provider !== input.provider) throw new Error("Payment provider cannot change after order payment starts");
     if (existing.providerCheckoutId && (existing.amount !== input.amount || existing.currency !== input.currency || existing.connectedAccountId !== input.connectedAccountId)) throw new Error("Payment configuration cannot change after Checkout starts");
-    if (!existing.providerCheckoutId) return prisma.payment.update({ where: { id: existing.id }, data: { amount: input.amount, currency: input.currency, platformFeeCents: input.platformFeeCents, photographerProceedsCents: input.photographerProceedsCents, connectedAccountId: input.connectedAccountId } });
+    if (!existing.providerCheckoutId && existing.status === "PENDING") return prisma.payment.update({ where: { id: existing.id }, data: { amount: input.amount, currency: input.currency, platformFeeCents: input.platformFeeCents, photographerProceedsCents: input.photographerProceedsCents, connectedAccountId: input.connectedAccountId } });
     return existing;
   }
   try {
-    return await prisma.payment.create({ data: { orderId: input.orderId, provider: "STRIPE", amount: input.amount, currency: input.currency, platformFeeCents: input.platformFeeCents, photographerProceedsCents: input.photographerProceedsCents, connectedAccountId: input.connectedAccountId, idempotencyKey: `order:${input.orderId}` } });
+    return await prisma.payment.create({ data: { orderId: input.orderId, provider: input.provider, amount: input.amount, currency: input.currency, platformFeeCents: input.platformFeeCents, photographerProceedsCents: input.photographerProceedsCents, connectedAccountId: input.connectedAccountId, idempotencyKey: `order:${input.orderId}` } });
   } catch (error) {
     const raced = await prisma.payment.findUnique({ where: { orderId: input.orderId } });
     if (!raced) throw error;
@@ -28,14 +30,40 @@ export async function initiatePayment(publicOrderCode: string) {
 
   const connected = await syncStripeConnectAccount(order.photographerId);
   if (!connected || !isStripeConnectReady(connected)) throw new Error("Photographer Stripe account is not payment-ready");
+  const available = await getAvailablePaymentMethods(order.photographerId);
+  if (!available.stripe) throw new Error("Photographer Stripe payments are not currently available");
   const platformFeeCents = calculatePlatformFeeCents(order.totalCents);
   const photographerProceedsCents = calculateProceedsCents(order.totalCents, platformFeeCents);
-  const payment = await getOrCreatePayment({ orderId: order.id, amount: order.totalCents, currency: order.currency, platformFeeCents, photographerProceedsCents, connectedAccountId: connected.stripeAccountId });
+  const payment = await getOrCreatePayment({ orderId: order.id, provider: "STRIPE", amount: order.totalCents, currency: order.currency, platformFeeCents, photographerProceedsCents, connectedAccountId: connected.stripeAccountId });
   const base = process.env.PUBLIC_BASE_URL;
   if (!base) throw new Error("PUBLIC_BASE_URL is required");
   const session = await paymentProvider().createCheckout({ paymentId: payment.id, publicOrderCode: order.publicOrderCode, amountCents: payment.amount, platformFeeCents: payment.platformFeeCents, connectedAccountId: payment.connectedAccountId || connected.stripeAccountId, currency: payment.currency, customerEmail: order.customerEmail, successUrl: `${base}/order/${order.publicOrderCode}?checkout=return`, cancelUrl: `${base}/order/${order.publicOrderCode}?checkout=cancel` });
   await prisma.payment.update({ where: { id: payment.id }, data: { providerCheckoutId: session.providerCheckoutId, providerPaymentId: session.providerPaymentId } });
   return session.checkoutUrl;
+}
+
+export async function startZellePayment(publicOrderCode: string) {
+  const order = await prisma.order.findUnique({ where: { publicOrderCode }, include: { payment: true, photographer: true } });
+  if (!order) throw new Error("Order not found");
+  if (order.status !== "PENDING_PAYMENT") throw new Error("Order is not payable");
+  const available = await getAvailablePaymentMethods(order.photographerId);
+  if (!available.zelle || !available.settings.zelleDisplayName || !available.settings.zellePaymentIdentifier) throw new Error("Photographer Zelle payments are not currently available");
+  const platformFeeCents = calculatePlatformFeeCents(order.totalCents);
+  const photographerProceedsCents = calculateProceedsCents(order.totalCents, platformFeeCents);
+  const payment = await getOrCreatePayment({ orderId: order.id, provider: "ZELLE", amount: order.totalCents, currency: order.currency, platformFeeCents, photographerProceedsCents });
+  await prisma.$transaction([
+    prisma.payment.update({ where: { id: payment.id }, data: { status: "AWAITING_PAYMENT_CONFIRMATION" } }),
+    prisma.order.update({ where: { id: order.id }, data: { status: "AWAITING_PAYMENT_CONFIRMATION" } }),
+  ]);
+  return { orderId: order.id, publicOrderCode: order.publicOrderCode, amountCents: order.totalCents, currency: order.currency, displayName: available.settings.zelleDisplayName, paymentIdentifier: available.settings.zellePaymentIdentifier, instructions: available.settings.zelleInstructions, qrKey: available.settings.zelleQrKey };
+}
+
+export async function validatePaymentSelection(publicOrderCode: string, provider: "stripe" | "zelle") {
+  const order = await prisma.order.findUnique({ where: { publicOrderCode }, select: { photographerId: true, status: true } });
+  if (!order || order.status !== "PENDING_PAYMENT") throw new Error("Order is not payable");
+  const available = await getAvailablePaymentMethods(order.photographerId);
+  if (provider === "stripe" && !available.stripe) throw new Error("Photographer Stripe payments are not currently available");
+  if (provider === "zelle" && !available.zelle) throw new Error("Photographer Zelle payments are not currently available");
 }
 
 export async function processStripeWebhook(payload: string, signature: string) {

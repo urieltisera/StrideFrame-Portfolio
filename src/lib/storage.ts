@@ -10,6 +10,9 @@ export interface StorageProvider {
   getProtectedOriginal(key: string): Promise<Buffer>;
   createSignedOriginalDownload?(key: string, ttlSeconds: number): Promise<string>;
   getPublicPreviewUrl(key: string): string;
+  putAsset(file: StoredFile): Promise<void>;
+  deleteAsset(key: string): Promise<void>;
+  getAsset(key: string): Promise<Buffer>;
 }
 
 function safeKey(key: string) { if (!/^[a-zA-Z0-9._/-]+$/.test(key) || key.includes("..")) throw new Error("Invalid storage key"); return key; }
@@ -23,6 +26,9 @@ export class LocalStorageProvider implements StorageProvider {
   async deleteOriginal(key: string) { await fs.rm(this.file("originals", key), { force:true }); }
   async deletePreview(key: string) { await fs.rm(this.file("previews", key), { force:true }); }
   async getProtectedOriginal(key: string) { return fs.readFile(this.file("originals", key)); }
+  async putAsset(file: StoredFile) { return this.put("assets", file); }
+  async deleteAsset(key: string) { await fs.rm(this.file("assets", key), { force: true }); }
+  async getAsset(key: string) { return fs.readFile(this.file("assets", key)); }
   getPublicPreviewUrl(key: string) { return `/api/previews/${key}`; }
 }
 

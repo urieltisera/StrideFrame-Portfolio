@@ -14,6 +14,7 @@ enum PublishStatus {
 
 enum OrderStatus {
   PENDING_PAYMENT
+  AWAITING_PAYMENT_CONFIRMATION
   PAID
   PAYMENT_FAILED
   CANCELLED
@@ -22,6 +23,7 @@ enum OrderStatus {
 
 enum PaymentStatus {
   PENDING
+  AWAITING_PAYMENT_CONFIRMATION
   SUCCEEDED
   FAILED
   CANCELLED
@@ -58,6 +60,11 @@ enum FaceIndexJobStatus {
   FAILED
 }
 
+enum ManualPaymentAction {
+  CONFIRMED
+  REJECTED
+}
+
 model Photographer {
   id                   String                @id @default(cuid())
   email                String                @unique
@@ -70,8 +77,25 @@ model Photographer {
   qrLinks              QRLink[]
   orders               Order[]
   stripeConnectAccount StripeConnectAccount?
+  paymentSettings      PhotographerPaymentSettings?
+  manualPaymentAudits  ManualPaymentAudit[]
 
   @@index([createdAt])
+}
+
+model PhotographerPaymentSettings {
+  id                       String       @id @default(cuid())
+  photographerId           String       @unique
+  photographer             Photographer @relation(fields: [photographerId], references: [id], onDelete: Cascade)
+  stripeEnabled            Boolean      @default(true)
+  zelleEnabled             Boolean      @default(false)
+  zelleDisplayName         String?
+  zellePaymentIdentifier   String?
+  zelleInstructions        String?
+  zelleQrKey               String?      @unique
+  zelleQrContentType       String?
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
 }
 
 model StripeConnectAccount {
@@ -220,6 +244,7 @@ model Order {
   items             OrderItem[]
   payment           Payment?
   grants            DownloadGrant[]
+  manualPaymentAudits ManualPaymentAudit[]
 
   @@index([photographerId, status])
   @@index([customerEmail])
@@ -256,9 +281,32 @@ model Payment {
   status                    PaymentStatus @default(PENDING)
   idempotencyKey            String        @unique
   rawResponse               Json?
+  manualAudits              ManualPaymentAudit[]
   createdAt                 DateTime      @default(now())
   updatedAt                 DateTime      @updatedAt
   paidAt                    DateTime?
+}
+
+model ManualPaymentAudit {
+  id                   String              @id @default(cuid())
+  orderId              String
+  order                Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentId            String
+  payment              Payment             @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  photographerId       String
+  photographer         Photographer        @relation(fields: [photographerId], references: [id], onDelete: Cascade)
+  provider             String
+  action               ManualPaymentAction
+  previousOrderStatus  OrderStatus
+  resultingOrderStatus OrderStatus
+  previousPaymentStatus PaymentStatus
+  resultingPaymentStatus PaymentStatus
+  note                 String?
+  createdAt            DateTime            @default(now())
+
+  @@unique([paymentId, action])
+  @@index([photographerId, action, createdAt])
+  @@index([orderId, createdAt])
 }
 
 model PaymentWebhookEvent {
