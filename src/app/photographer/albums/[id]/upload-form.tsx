@@ -5,7 +5,7 @@ import { Button } from "@/components/button";
 import { Card } from "@/components/card";
 import { MAX_PHOTO_BYTES, MAX_PHOTOS_PER_UPLOAD, supportedMimeTypes } from "@/lib/photo-config";
 
-export function UploadForm({ albumId, eventId, action }: { albumId: string; eventId: string; action: (data: FormData) => void }) {
+export function UploadForm({ albumId, eventId, albumPriceCents, action }: { albumId: string; eventId: string; albumPriceCents: number; action: (data: FormData) => void }) {
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const choose = (list: FileList | null) => {
@@ -24,7 +24,7 @@ export function UploadForm({ albumId, eventId, action }: { albumId: string; even
         <input name="photos" type="file" multiple accept={supportedMimeTypes.join(",")} onChange={(event) => choose(event.target.files)} className="sr-only" />
       </label>
       {files.length > 0 && <Card className="p-4"><p className="sf-label">Selected files · {files.length}</p><ul className="mt-3 grid gap-2 text-sm">{files.map((file) => { const invalid = file.size > MAX_PHOTO_BYTES || !supportedMimeTypes.includes(file.type as never); return <li key={`${file.name}-${file.size}`} className={`flex flex-wrap justify-between gap-2 ${invalid ? "text-[var(--error)]" : "text-[var(--text-secondary)]"}`}><span className="truncate">{file.name}</span><span>{(file.size / 1024 / 1024).toFixed(1)} MB · {file.size > MAX_PHOTO_BYTES ? "Too large" : !supportedMimeTypes.includes(file.type as never) ? "Unsupported type" : "Ready"}</span></li>; })}</ul></Card>}
-      <label htmlFor="price-dollars" className="grid gap-2"><span className="sf-label">Price in USD</span><input id="price-dollars" name="priceDollars" inputMode="decimal" pattern="^\d+(\.\d{1,2})?$" defaultValue="15.00" className="min-h-11 rounded-[var(--radius-medium)] border border-[var(--border)] bg-[var(--surface-elevated)] px-3 text-[var(--text-primary)] focus:border-[var(--accent)]" /><span className="sf-caption">Enter dollars and cents, for example 15.00.</span></label>
+      <div className="rounded-[var(--radius-medium)] border border-[var(--border)] bg-[var(--surface-elevated)] p-4"><p className="sf-label">Price per photo</p><p className="mt-2 text-2xl font-black">${(albumPriceCents / 100).toFixed(2)} USD</p><p className="sf-caption mt-1">Every uploaded photo inherits this album price unless you later set an individual override.</p></div>
       <div className="flex flex-wrap items-center gap-4"><Button type="submit" loading={busy} disabled={busy || files.length === 0}>Upload photos</Button><p className="sf-caption">Invalid files are reported individually.</p></div>
     </form>
   );

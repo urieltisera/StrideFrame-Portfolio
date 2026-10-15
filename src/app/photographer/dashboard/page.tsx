@@ -7,7 +7,7 @@ import { Input } from "@/components/form-fields";
 import { PhotographerShell } from "@/components/photographer-shell";
 import { StatusBadge } from "@/components/badge";
 import { getCurrentPhotographer } from "@/lib/auth";
-import { createEvent, logout } from "@/app/photographer/actions";
+import { createEvent, logout, uploadIndividualPhoto } from "@/app/photographer/actions";
 import { prisma } from "@/lib/prisma";
 import { formatUsd } from "@/lib/money";
 
@@ -104,6 +104,17 @@ export default async function Dashboard() {
         </Card>
       </div>
       <section className="mt-10" aria-labelledby="orders-heading"><div className="flex items-end justify-between gap-4"><div><p className="sf-label text-[var(--accent)]">Commerce</p><h2 id="orders-heading" className="sf-section-title mt-2">Recent orders</h2></div><span className="sf-caption">{orders.length} recent</span></div><Card className="mt-5 overflow-hidden p-0"><div className="divide-y divide-[var(--border)]">{orders.length ? orders.map((order) => <div key={order.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div><p className="font-bold">{order.publicOrderCode}</p><p className="sf-caption mt-1">{order.customerEmail} · {order.items.length} photos</p></div><div className="flex items-center gap-4"><span className="font-black">{formatUsd(order.totalCents)}</span><StatusBadge status={order.status} /></div></div>) : <div className="p-6"><EmptyState title="No orders yet" description="Verified customer orders will appear here." /></div>}</div></Card></section>
+      <Card className="mt-8 p-6 md:p-7">
+        <p className="sf-label text-[var(--accent)]">Quick upload</p>
+        <h2 className="sf-section-title mt-2">Sell one photo</h2>
+        <p className="sf-body-secondary mt-2">Upload one image with its own USD retail price. We organize it internally without requiring a separate album setup.</p>
+        <form action={uploadIndividualPhoto} className="mt-5 grid gap-4 md:grid-cols-3">
+          <label className="grid gap-2"><span className="sf-label">Event</span><select name="eventId" required className="min-h-11 rounded-[var(--radius-medium)] border border-[var(--border)] bg-[var(--surface-elevated)] px-3 text-sm">{events.map((event) => <option key={event.id} value={event.id}>{event.title}</option>)}</select></label>
+          <Input id="individual-price" name="priceDollars" label="Price per photo (USD)" required inputMode="decimal" pattern="^\d+(\.\d{1,2})?$" defaultValue="5.00" />
+          <label className="grid gap-2"><span className="sf-label">Photo</span><input name="photo" type="file" accept="image/jpeg,image/png,image/webp" required className="min-h-11 rounded-[var(--radius-medium)] border border-[var(--border)] bg-[var(--surface-elevated)] p-2 text-sm" /></label>
+          <Button type="submit" className="md:col-span-3">Upload individual photo</Button>
+        </form>
+      </Card>
     </PhotographerShell>
   );
 }

@@ -35,7 +35,7 @@ suite("persisted Face Search metadata and multi-face semantics", () => {
   afterAll(async () => { await db.$disconnect(); });
 
   async function createPhoto(albumId: string, suffix: string) {
-    return db.photo.create({ data: { albumId, originalKey: `private/${suffix}`, previewKey: `public/${suffix}`, originalFilename: `${suffix}.jpg`, mimeType: "image/jpeg", fileSize: 10, priceCents: 1000, currency: "USD", status: "PUBLISHED" } });
+    return db.photo.create({ data: { albumId, originalKey: `private/${suffix}`, previewKey: `public/${suffix}`, originalFilename: `${suffix}.jpg`, mimeType: "image/jpeg", fileSize: 10, priceOverrideCents: 1000, currency: "USD", status: "PUBLISHED" } });
   }
 
   async function replaceFaces(photoId: string, eventId: string, albumId: string, faces: Awaited<ReturnType<typeof provider.detectFaces>>, compatibility = faceCompatibilityKey(metadata), rowMetadata = metadata) {

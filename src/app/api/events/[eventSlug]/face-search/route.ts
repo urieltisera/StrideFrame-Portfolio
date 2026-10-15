@@ -13,6 +13,7 @@ import {
   tryAcquireFaceSearchInference,
   withFaceSearchTimeout,
 } from "@/lib/face-security";
+import { resolveEffectivePhotoPrice } from "@/lib/pricing";
 
 export async function GET() {
   const availability = getFaceSearchAvailability();
@@ -67,9 +68,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ eve
     for (const match of matches) best.set(match.photoId, Math.max(best.get(match.photoId) || 0, Number(match.distance)));
     const photos = await prisma.photo.findMany({
       where: { id: { in: [...best.keys()] }, status: "PUBLISHED", album: { status: "PUBLISHED", event: { id: event.id, status: "PUBLISHED" } } },
-      select: { id: true, previewKey: true, originalFilename: true, priceCents: true, album: { select: { title: true } } },
+      select: { id: true, previewKey: true, originalFilename: true, priceOverrideCents: true, currency: true, album: { select: { title: true, priceCents: true } } },
     });
-    return NextResponse.json({ results: photos.map((photo) => ({ ...photo, previewUrl: `/api/previews/${photo.previewKey}`, score: best.get(photo.id) })) });
+    return NextResponse.json({ results: photos.map((photo) => { const price = resolveEffectivePhotoPrice(photo); return { id: photo.id, previewUrl: `/api/previews/${photo.previewKey}`, originalFilename: photo.originalFilename, album: photo.album, priceCents: price.priceCents, score: best.get(photo.id) }; }) });
   } catch (error) {
     if (error instanceof Error && error.name === "FaceSearchUnavailableError") return NextResponse.json({ error: FACE_SEARCH_UNAVAILABLE_MESSAGE, code: "FACE_SEARCH_UNAVAILABLE" }, { status: 503 });
     if (error instanceof Error && error.message === "Face search processing timed out") return NextResponse.json({ error: FACE_SEARCH_TEMPORARY_MESSAGE, code: "FACE_SEARCH_TEMPORARY_FAILURE" }, { status: 503, headers: { "Retry-After": "1" } });

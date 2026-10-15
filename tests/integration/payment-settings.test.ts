@@ -44,7 +44,7 @@ describe.skipIf(!hasDatabase)("photographer payment settings and Zelle boundary"
     await db.photographerPaymentSettings.create({ data: { photographerId: photographer.id, zelleEnabled: true, zelleDisplayName: "Owner Photos", zellePaymentIdentifier: "owner@example.com", zelleInstructions: "Use the order reference." } });
     const event = await db.event.create({ data: { photographerId: photographer.id, title: "Zelle Event", slug: "zelle-event", accessCode: "zelle-code", status: "PUBLISHED" } });
     const album = await db.album.create({ data: { photographerId: photographer.id, eventId: event.id, title: "Race", slug: "race", status: "PUBLISHED" } });
-    const photo = await db.photo.create({ data: { albumId: album.id, originalKey: "private/zelle", previewKey: "public/zelle", originalFilename: "race.jpg", mimeType: "image/jpeg", fileSize: 10, priceCents: 2750, currency: "USD", status: "PUBLISHED" } });
+    const photo = await db.photo.create({ data: { albumId: album.id, originalKey: "private/zelle", previewKey: "public/zelle", originalFilename: "race.jpg", mimeType: "image/jpeg", fileSize: 10, priceOverrideCents: 2750, currency: "USD", status: "PUBLISHED" } });
     const order = await createPendingOrder({ photoIds: [photo.id], email: "buyer@example.com" });
     const details = await startZellePayment(order.publicOrderCode);
     const stored = await db.order.findUnique({ where: { id: order.id }, include: { payment: true, grants: true } });
@@ -64,7 +64,7 @@ describe.skipIf(!hasDatabase)("photographer payment settings and Zelle boundary"
     await db.photographerPaymentSettings.create({ data: { photographerId: owner.id, zelleEnabled: true, zelleDisplayName: "Owner Photos", zellePaymentIdentifier: "owner@example.com" } });
     const event = await db.event.create({ data: { photographerId: owner.id, title: "Audit Event", slug: "audit-event", accessCode: "audit-code", status: "PUBLISHED" } });
     const album = await db.album.create({ data: { photographerId: owner.id, eventId: event.id, title: "Race", slug: "race", status: "PUBLISHED" } });
-    const photo = await db.photo.create({ data: { albumId: album.id, originalKey: "private/audit", previewKey: "public/audit", originalFilename: "audit.jpg", mimeType: "image/jpeg", fileSize: 10, priceCents: 3000, currency: "USD", status: "PUBLISHED" } });
+    const photo = await db.photo.create({ data: { albumId: album.id, originalKey: "private/audit", previewKey: "public/audit", originalFilename: "audit.jpg", mimeType: "image/jpeg", fileSize: 10, priceOverrideCents: 3000, currency: "USD", status: "PUBLISHED" } });
     const order = await createPendingOrder({ photoIds: [photo.id], email: "buyer@example.com" });
     await startZellePayment(order.publicOrderCode);
     await expect(getOwnedZelleOrder(other.id, order.id)).resolves.toBeNull();
@@ -83,7 +83,7 @@ describe.skipIf(!hasDatabase)("photographer payment settings and Zelle boundary"
     await expect(authorizeDownload(download!.token, photo.id)).resolves.toMatchObject({ photo: { id: photo.id } });
     await expect(rejectManualPayment({ photographerId: owner.id, orderId: order.id })).rejects.toThrow("not awaiting confirmation");
 
-    const secondPhoto = await db.photo.create({ data: { albumId: album.id, originalKey: "private/reject", previewKey: "public/reject", originalFilename: "reject.jpg", mimeType: "image/jpeg", fileSize: 10, priceCents: 3100, currency: "USD", status: "PUBLISHED" } });
+    const secondPhoto = await db.photo.create({ data: { albumId: album.id, originalKey: "private/reject", previewKey: "public/reject", originalFilename: "reject.jpg", mimeType: "image/jpeg", fileSize: 10, priceOverrideCents: 3100, currency: "USD", status: "PUBLISHED" } });
     const rejectedOrder = await createPendingOrder({ photoIds: [secondPhoto.id], email: "buyer-two@example.com" });
     await startZellePayment(rejectedOrder.publicOrderCode);
     const rejected = await rejectManualPayment({ photographerId: owner.id, orderId: rejectedOrder.id, note: "No matching incoming payment" });
@@ -99,7 +99,7 @@ describe.skipIf(!hasDatabase)("photographer payment settings and Zelle boundary"
     await db.photographerPaymentSettings.create({ data: { photographerId: photographer.id, zelleEnabled: true, zelleDisplayName: "Bundle Photos", zellePaymentIdentifier: "bundle@example.com" } });
     const event = await db.event.create({ data: { photographerId: photographer.id, title: "Bundle Event", slug: "bundle-event", accessCode: "bundle-code", status: "PUBLISHED" } });
     const album = await db.album.create({ data: { photographerId: photographer.id, eventId: event.id, title: "Bundle", slug: "bundle", status: "PUBLISHED" } });
-    const photos = await Promise.all([1, 2, 3, 4].map((index) => db.photo.create({ data: { albumId: album.id, originalKey: `private/bundle-${index}`, previewKey: `public/bundle-${index}`, originalFilename: `bundle-${index}.jpg`, mimeType: "image/jpeg", fileSize: 10, priceCents: 1000, currency: "USD", status: "PUBLISHED" } })));
+    const photos = await Promise.all([1, 2, 3, 4].map((index) => db.photo.create({ data: { albumId: album.id, originalKey: `private/bundle-${index}`, previewKey: `public/bundle-${index}`, originalFilename: `bundle-${index}.jpg`, mimeType: "image/jpeg", fileSize: 10, priceOverrideCents: 1000, currency: "USD", status: "PUBLISHED" } })));
     const order = await createPendingOrder({ photoIds: photos.map((photo) => photo.id), email: "bundle-buyer@example.com" });
     await startZellePayment(order.publicOrderCode);
     await confirmManualPayment({ photographerId: photographer.id, orderId: order.id });

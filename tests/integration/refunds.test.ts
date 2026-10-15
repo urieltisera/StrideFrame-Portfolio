@@ -16,7 +16,7 @@ async function createSale(photoCount = 5, priceCents = 1000) {
   await db.photographerPaymentSettings.create({ data: { photographerId: photographer.id, zelleEnabled: true, zelleDisplayName: "Refund Owner", zellePaymentIdentifier: "refund@example.com" } });
   const event = await db.event.create({ data: { photographerId: photographer.id, title: "Refund Event", slug: `refund-event-${Date.now()}-${Math.random()}`, accessCode: `refund-code-${Date.now()}-${Math.random()}`, status: "PUBLISHED" } });
   const album = await db.album.create({ data: { photographerId: photographer.id, eventId: event.id, title: "Refund Album", slug: "refund-album", status: "PUBLISHED" } });
-  const photos = await Promise.all(Array.from({ length: photoCount }, (_, index) => db.photo.create({ data: { albumId: album.id, originalKey: `private/refund-${index}`, previewKey: `public/refund-${index}`, originalFilename: `refund-${index}.jpg`, mimeType: "image/jpeg", fileSize: 10, priceCents, currency: "USD", status: "PUBLISHED" } })));
+  const photos = await Promise.all(Array.from({ length: photoCount }, (_, index) => db.photo.create({ data: { albumId: album.id, originalKey: `private/refund-${index}`, previewKey: `public/refund-${index}`, originalFilename: `refund-${index}.jpg`, mimeType: "image/jpeg", fileSize: 10, priceOverrideCents: priceCents, currency: "USD", status: "PUBLISHED" } })));
   const order = await createPendingOrder({ photoIds: photos.map(photo => photo.id), email: "refund-buyer@example.com" });
   await startZellePayment(order.publicOrderCode);
   await confirmManualPayment({ photographerId: photographer.id, orderId: order.id });
