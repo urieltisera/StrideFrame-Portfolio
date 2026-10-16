@@ -97,6 +97,8 @@ model Photographer {
   email                String                       @unique
   name                 String
   passwordHash         String
+  publicSlug           String?                      @unique
+  publicProfileEnabled Boolean                      @default(false)
   createdAt            DateTime                     @default(now())
   updatedAt            DateTime                     @updatedAt
   events               Event[]

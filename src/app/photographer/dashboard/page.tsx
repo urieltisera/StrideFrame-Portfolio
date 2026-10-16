@@ -7,9 +7,11 @@ import { Input } from "@/components/form-fields";
 import { PhotographerShell } from "@/components/photographer-shell";
 import { StatusBadge } from "@/components/badge";
 import { getCurrentPhotographer } from "@/lib/auth";
-import { createEvent, logout, uploadIndividualPhoto } from "@/app/photographer/actions";
+import { createEvent, logout, togglePublicProfile, uploadIndividualPhoto } from "@/app/photographer/actions";
 import { prisma } from "@/lib/prisma";
 import { formatUsd } from "@/lib/money";
+import { publicProfileUrl } from "@/lib/qr";
+import { CopyProfileLink } from "./profile-link-actions";
 
 export default async function Dashboard() {
   const person = await getCurrentPhotographer();
@@ -114,6 +116,21 @@ export default async function Dashboard() {
           <label className="grid gap-2"><span className="sf-label">Photo</span><input name="photo" type="file" accept="image/jpeg,image/png,image/webp" required className="min-h-11 rounded-[var(--radius-medium)] border border-[var(--border)] bg-[var(--surface-elevated)] p-2 text-sm" /></label>
           <Button type="submit" className="md:col-span-3">Upload individual photo</Button>
         </form>
+      </Card>
+      <Card id="public-profile" className="mt-8 p-6 md:p-7">
+        <p className="sf-label text-[var(--accent)]">Public discovery</p>
+        <h2 className="sf-section-title mt-2">Public profile</h2>
+        <p className="sf-body-secondary mt-2">Share one permanent link or QR code for your published event galleries.</p>
+        {person.publicProfileEnabled && person.publicSlug ? <>
+          <p className="mt-5 break-all rounded-[var(--radius-medium)] bg-[var(--surface-elevated)] p-3 text-sm">{publicProfileUrl(person.publicSlug)}</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link href={`/p/${person.publicSlug}`} target="_blank"><Button type="button" variant="secondary">Preview profile</Button></Link>
+            <CopyProfileLink url={publicProfileUrl(person.publicSlug)} />
+            <a href={`/api/photographer/profile-qr`} download><Button type="button" variant="secondary">Download QR</Button></a>
+            <a href={`/api/photographer/profile-qr?format=svg`} download><Button type="button" variant="secondary">Download SVG</Button></a>
+            <form action={togglePublicProfile}><input type="hidden" name="enabled" value="false" /><Button type="submit" variant="ghost">Disable profile</Button></form>
+          </div>
+        </> : <form action={togglePublicProfile} className="mt-5"><input type="hidden" name="enabled" value="true" /><Button type="submit">Enable public profile</Button></form>}
       </Card>
     </PhotographerShell>
   );
