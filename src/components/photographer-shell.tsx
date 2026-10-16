@@ -1,11 +1,19 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { BrandLogo } from "./brand";
+import { Icon, type IconName } from "./icon";
 
 type PhotographerShellProps = {
   children: ReactNode;
   active?: "dashboard" | "events" | "settings";
   accountName?: string;
 };
+
+const navigation: Array<{ label: string; href: string; active: "dashboard" | "events" | "settings"; icon: IconName }> = [
+  { label: "Dashboard", href: "/photographer/dashboard", active: "dashboard", icon: "grid" },
+  { label: "Events", href: "/photographer/dashboard#events", active: "events", icon: "calendar" },
+  { label: "Payment settings", href: "/photographer/settings/payments", active: "settings", icon: "card" },
+];
 
 export function PhotographerShell({ children, active = "dashboard", accountName }: PhotographerShellProps) {
   const navItem = (item: "dashboard" | "events" | "settings") =>
@@ -17,35 +25,34 @@ export function PhotographerShell({ children, active = "dashboard", accountName 
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--text-primary)]">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col bg-[var(--navy)] p-6 text-white lg:flex">
-        <Link href="/photographer/dashboard" className="flex items-center gap-2 text-xl font-black tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--accent)] text-sm">✦</span>Stride<span className="text-[#9d8bff]">Frame</span>
-        </Link>
+      <aside className="fixed inset-y-0 left-0 z-20 hidden w-60 flex-col bg-[var(--ink)] px-5 py-6 text-white lg:flex">
+        <BrandLogo href="/photographer/dashboard" light />
         <p className="mt-2 text-xs text-white/45">Photographer workspace</p>
-        <nav aria-label="Photographer navigation" className="mt-12 grid gap-2">
-          <Link className={navItem("dashboard")} href="/photographer/dashboard"><span aria-hidden="true">▦</span>Dashboard</Link>
-          <Link className={navItem("events")} href="/photographer/dashboard#events"><span aria-hidden="true">◫</span>Events</Link>
-          <Link className="flex items-center gap-3 rounded-[var(--radius-medium)] px-3 py-2.5 text-sm font-semibold text-white/60 hover:bg-white/8 hover:text-white" href="/photographer/dashboard#events"><span aria-hidden="true">▧</span>Photos</Link>
-          <Link className="flex items-center gap-3 rounded-[var(--radius-medium)] px-3 py-2.5 text-sm font-semibold text-white/60 hover:bg-white/8 hover:text-white" href="/photographer/dashboard#events"><span aria-hidden="true">◌</span>Orders</Link>
-          <Link className={navItem("settings")} href="/photographer/settings/payments"><span aria-hidden="true">⚙</span>Payment settings</Link>
-        </nav>
+        <div className="mt-10 grid gap-7">
+          <nav aria-label="Photographer navigation" className="grid gap-1">
+            <p className="sf-label mb-2 px-3 text-white/40">Workspace</p>
+            {navigation.slice(0, 2).map((item) => <Link key={item.href} className={navItem(item.active)} href={item.href}><Icon name={item.icon} size={18} />{item.label}</Link>)}
+          </nav>
+          <nav aria-label="Business navigation" className="grid gap-1">
+            <p className="sf-label mb-2 px-3 text-white/40">Business</p>
+            {navigation.slice(2).map((item) => <Link key={item.href} className={navItem(item.active)} href={item.href}><Icon name={item.icon} size={18} />{item.label}</Link>)}
+          </nav>
+        </div>
         <div className="mt-auto border-t border-white/10 pt-5">
           <p className="text-xs text-white/45">Signed in as</p>
           <p className="mt-1 truncate text-sm font-semibold text-white">{accountName || "Photographer"}</p>
         </div>
       </aside>
-      <div className="border-b border-[var(--border)] bg-[var(--navy)] text-white lg:hidden">
-        <div className="flex items-center justify-between gap-4 px-5 py-4">
-          <Link href="/photographer/dashboard" className="font-black tracking-tight">Stride<span className="text-[#9d8bff]">Frame</span></Link>
-          <nav aria-label="Photographer mobile navigation" className="flex gap-1 text-xs">
-            <Link className={navItem("dashboard")} href="/photographer/dashboard">Dashboard</Link>
-            <Link className={navItem("events")} href="/photographer/dashboard#events">Events</Link>
-            <Link className={navItem("settings")} href="/photographer/settings/payments">Payments</Link>
+      <div className="border-b border-white/10 bg-[var(--ink)] text-white lg:hidden">
+        <div className="flex min-h-16 items-center justify-between gap-3 px-4 sm:px-6">
+          <BrandLogo href="/photographer/dashboard" light compact />
+          <nav aria-label="Photographer mobile navigation" className="flex min-w-0 items-center gap-1 overflow-x-auto">
+            {navigation.map((item) => <Link key={item.href} className={`${navItem(item.active)} shrink-0 px-2.5 text-xs`} href={item.href}><Icon name={item.icon} size={16} /><span className="hidden min-[430px]:inline">{item.label === "Payment settings" ? "Payments" : item.label}</span></Link>)}
           </nav>
         </div>
       </div>
-      <main className="min-h-screen lg:pl-64">
-        <div className="mx-auto max-w-7xl p-5 md:p-8 lg:p-10">{children}</div>
+      <main className="min-h-screen lg:pl-60">
+        <div className="mx-auto max-w-7xl p-5 sm:p-6 md:p-8 lg:p-10">{children}</div>
       </main>
     </div>
   );
