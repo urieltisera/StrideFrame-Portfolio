@@ -8,6 +8,7 @@ import path from "node:path";
 import { createPhoto, deletePhoto } from "../../src/lib/photos";
 import { createDraftEvent } from "../../src/lib/events";
 import { getOrCreateDefaultAlbum } from "../../src/lib/upload-workflow";
+import { publishAlbumForPhotographer } from "../../src/lib/album-publication";
 import { LocalStorageProvider } from "../../src/lib/storage";
 import { createPendingOrder } from "../../src/lib/orders";
 import { createDownloadGrant, authorizeDownload, revokeOrderDownloads, downloadTokenHash } from "../../src/lib/downloads";
@@ -70,6 +71,25 @@ suite("PostgreSQL critical flows", () => {
     const event=await db.event.create({data:{photographerId:owner.id,title:"QR Event",slug:"qr-event",accessCode:"qr-code",status:"DRAFT"}}); const album=await db.album.create({data:{photographerId:owner.id,eventId:event.id,title:"QR Album",slug:"qr-album",status:"PUBLISHED"}}); const code="opaque-qr-code";
     const link=await db.qRLink.create({data:{code,photographerId:owner.id,eventId:event.id}}); expect(link.code).not.toContain(event.id); expect(await db.qRLink.findFirst({where:{eventId:event.id,photographerId:other.id}})).toBeNull();
     expect(await db.qRLink.findFirst({where:{code,status:"ACTIVE",event:{status:"PUBLISHED"}}})).toBeNull(); await db.event.update({where:{id:event.id},data:{status:"PUBLISHED"}}); expect(await db.qRLink.findFirst({where:{code,status:"ACTIVE",event:{status:"PUBLISHED"}}})).not.toBeNull(); await db.qRLink.update({where:{id:link.id},data:{status:"DISABLED"}}); expect(await db.qRLink.findFirst({where:{code,status:"ACTIVE"}})).toBeNull(); await db.qRLink.update({where:{id:link.id},data:{status:"ACTIVE"}}); expect(await db.qRLink.findFirst({where:{code,status:"ACTIVE",event:{status:"PUBLISHED"}}})).not.toBeNull(); await db.album.update({where:{id:album.id},data:{status:"DRAFT"}}); const albumQr=await db.qRLink.create({data:{code:"album-opaque-code",photographerId:owner.id,albumId:album.id}}); expect(await db.qRLink.findFirst({where:{id:albumQr.id,status:"ACTIVE",album:{status:"PUBLISHED",event:{status:"PUBLISHED"}}}})).toBeNull();
+  });
+  it("publishes an owned album with its event and reuses a stable QR without publishing draft photos", async () => {
+    const [owner, other] = await Promise.all([db.photographer.create({data:{email:"publish-owner@example.com",name:"Owner",passwordHash:"x"}}), db.photographer.create({data:{email:"publish-other@example.com",name:"Other",passwordHash:"x"}})]);
+    const event = await db.event.create({data:{photographerId:owner.id,title:"Private Event",slug:"private-publish-event",accessCode:"private-publish-code",status:"DRAFT"}});
+    const album = await db.album.create({data:{photographerId:owner.id,eventId:event.id,title:"Finish Line",slug:"finish-line",status:"DRAFT"}});
+    const publishedPhoto = await db.photo.create({data:{albumId:album.id,originalKey:"private/published",previewKey:"public/published",originalFilename:"published.jpg",mimeType:"image/jpeg",fileSize:10,status:"PUBLISHED"}});
+    const draftPhoto = await db.photo.create({data:{albumId:album.id,originalKey:"private/draft",previewKey:"public/draft",originalFilename:"draft.jpg",mimeType:"image/jpeg",fileSize:10,status:"DRAFT"}});
+    await expect(publishAlbumForPhotographer(album.id, other.id)).rejects.toThrow("not owned");
+    await publishAlbumForPhotographer(album.id, owner.id);
+    const first = await db.qRLink.findFirst({where:{albumId:album.id}});
+    expect(await db.event.findUnique({where:{id:event.id},select:{status:true}})).toMatchObject({status:"PUBLISHED"});
+    expect(await db.album.findUnique({where:{id:album.id},select:{status:true}})).toMatchObject({status:"PUBLISHED"});
+    expect(await db.photo.findUnique({where:{id:publishedPhoto.id},select:{status:true}})).toMatchObject({status:"PUBLISHED"});
+    expect(await db.photo.findUnique({where:{id:draftPhoto.id},select:{status:true}})).toMatchObject({status:"DRAFT"});
+    await db.album.update({where:{id:album.id},data:{status:"DRAFT"}});
+    expect(await db.qRLink.findFirst({where:{id:first?.id,status:"ACTIVE",album:{status:"PUBLISHED",event:{status:"PUBLISHED"}}}})).toBeNull();
+    await publishAlbumForPhotographer(album.id, owner.id);
+    const second = await db.qRLink.findFirst({where:{albumId:album.id}});
+    expect(second?.code).toBe(first?.code);
   });
   it("keeps public profiles scoped, opt-in, and independent from event QR links", async () => {
     const [owner, other] = await Promise.all([db.photographer.create({data:{email:"profile-owner@example.com",name:"Profile Owner",passwordHash:"x",publicSlug:"profile-owner-a1b2c3",publicProfileEnabled:true}}), db.photographer.create({data:{email:"profile-other@example.com",name:"Profile Other",passwordHash:"x",publicSlug:"profile-other-d4e5f6",publicProfileEnabled:false}})]);
