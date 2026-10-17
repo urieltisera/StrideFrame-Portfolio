@@ -31,4 +31,8 @@ button, input, select, textarea { font-family: inherit; }
 .sf-dot-grid { background-image: radial-gradient(#ffffff1c 1px, transparent 1px); background-size: 18px 18px; }
 .sf-glass { background: rgb(255 255 255 / .94); backdrop-filter: blur(12px); }
 .sf-photo-placeholder { background: var(--navy-soft); }
+.sf-workspace-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 1.25rem; }
+.sf-kicker { color: var(--accent); font-size: .6875rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.sf-rule { border-color: color-mix(in srgb, var(--border) 76%, transparent); }
+@media (max-width: 767px) { .sf-workspace-grid { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }

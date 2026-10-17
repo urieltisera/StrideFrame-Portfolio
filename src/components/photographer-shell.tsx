@@ -5,19 +5,22 @@ import { Icon, type IconName } from "./icon";
 
 type PhotographerShellProps = {
   children: ReactNode;
-  active?: "dashboard" | "events" | "settings" | "upload";
+  active?: "dashboard" | "events" | "photos" | "albums" | "orders" | "settings" | "profile" | "upload";
   accountName?: string;
 };
 
-const navigation: Array<{ label: string; href: string; active: "dashboard" | "events" | "settings" | "upload"; icon: IconName }> = [
+const navigation: Array<{ label: string; href: string; active: PhotographerShellProps["active"]; icon: IconName }> = [
   { label: "Upload photos", href: "/photographer/upload", active: "upload", icon: "upload" },
   { label: "Dashboard", href: "/photographer/dashboard", active: "dashboard", icon: "grid" },
-  { label: "Events", href: "/photographer/dashboard#events", active: "events", icon: "calendar" },
+  { label: "Photos", href: "/photographer/photos", active: "photos", icon: "image" },
+  { label: "Albums", href: "/photographer/albums", active: "albums", icon: "layers" },
+  { label: "Orders", href: "/photographer/orders", active: "orders", icon: "orders" },
   { label: "Payment settings", href: "/photographer/settings/payments", active: "settings", icon: "card" },
+  { label: "Public profile", href: "/photographer/dashboard#public-profile", active: "profile", icon: "user" },
 ];
 
 export function PhotographerShell({ children, active = "dashboard", accountName }: PhotographerShellProps) {
-  const navItem = (item: "dashboard" | "events" | "settings" | "upload") =>
+  const navItem = (item: PhotographerShellProps["active"]) =>
     `flex items-center gap-3 rounded-[var(--radius-medium)] px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
       active === item
         ? "bg-white/12 text-white"
@@ -32,12 +35,16 @@ export function PhotographerShell({ children, active = "dashboard", accountName 
         <Link href="/photographer/upload" className="mt-8 flex items-center justify-center gap-2 rounded-[var(--radius-small)] bg-[var(--orange)] px-3 py-3 text-sm font-bold text-white transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--orange)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ink)]"><Icon name="upload" size={18} />Upload photos</Link>
         <div className="mt-10 grid gap-7">
           <nav aria-label="Photographer navigation" className="grid gap-1">
-            <p className="sf-label mb-2 px-3 text-white/40">Workspace</p>
-            {navigation.slice(1, 3).map((item) => <Link key={item.href} className={navItem(item.active)} href={item.href}><Icon name={item.icon} size={18} />{item.label}</Link>)}
+            <p className="sf-label mb-2 px-3 text-white/40">Overview</p>
+            {navigation.slice(1, 2).map((item) => <Link key={item.href} className={navItem(item.active)} href={item.href}><Icon name={item.icon} size={18} />{item.label}</Link>)}
+            <p className="sf-label mb-2 mt-6 px-3 text-white/40">Workspace</p>
+            {navigation.slice(2, 5).map((item) => <Link key={item.href} className={navItem(item.active)} href={item.href}><Icon name={item.icon} size={18} />{item.label}</Link>)}
           </nav>
           <nav aria-label="Business navigation" className="grid gap-1">
             <p className="sf-label mb-2 px-3 text-white/40">Business</p>
-            {navigation.slice(3).map((item) => <Link key={item.href} className={navItem(item.active)} href={item.href}><Icon name={item.icon} size={18} />{item.label}</Link>)}
+            {navigation.slice(5, 6).map((item) => <Link key={item.href} className={navItem(item.active)} href={item.href}><Icon name={item.icon} size={18} />{item.label}</Link>)}
+            <p className="sf-label mb-2 mt-6 px-3 text-white/40">Account</p>
+            {navigation.slice(6).map((item) => <Link key={item.href} className={navItem(item.active)} href={item.href}><Icon name={item.icon} size={18} />{item.label}</Link>)}
           </nav>
         </div>
         <div className="mt-auto border-t border-white/10 pt-5">

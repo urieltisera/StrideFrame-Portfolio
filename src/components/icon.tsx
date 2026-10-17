@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type IconName = "grid" | "calendar" | "image" | "orders" | "card" | "user" | "settings" | "upload" | "menu" | "close" | "arrow" | "cart";
+export type IconName = "grid" | "calendar" | "image" | "orders" | "card" | "user" | "settings" | "upload" | "menu" | "close" | "arrow" | "cart" | "layers" | "external" | "search" | "check";
 
 const paths: Record<IconName, ReactNode> = {
   grid: <><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></>,
@@ -15,6 +15,10 @@ const paths: Record<IconName, ReactNode> = {
   close: <path d="m6 6 12 12M18 6 6 18" />,
   arrow: <><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></>,
   cart: <><path d="M3 4h2l2.2 10.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L20 8H7" /><circle cx="10" cy="20" r="1" /><circle cx="18" cy="20" r="1" /></>,
+  layers: <><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 12 9 5 9-5M3 16l9 5 9-5" /></>,
+  external: <><path d="M14 4h6v6M20 4l-9 9" /><path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5" /></>,
+  search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></>,
+  check: <path d="m5 12 4 4L19 6" />,
 };
 
 export function Icon({ name, size = 18, className = "" }: { name: IconName; size?: number; className?: string }) {
