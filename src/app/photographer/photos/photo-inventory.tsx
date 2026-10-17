@@ -57,7 +57,7 @@ export function PhotoInventory({ photos }: { photos: InventoryPhoto[] }) {
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
       {photos.map((photo) => {
         const selected = selectedIds.has(photo.id);
-        return <Card key={photo.id} className={`overflow-hidden p-0 ${selected ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30" : ""}`}>
+        return <Card key={photo.id} className={`sf-focus-pull overflow-hidden p-0 ${selected ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/30" : ""}`}>
           <div className="relative aspect-[4/3] bg-[var(--navy-soft)]">
             <SafeImage src={photo.previewUrl} alt={photo.alt} fallbackLabel="Preview unavailable" className="h-full w-full object-cover" />
             <label className="absolute left-3 top-3 inline-flex min-h-10 min-w-10 cursor-pointer items-center justify-center rounded-[var(--radius-small)] bg-[var(--ink)]/85 p-2 text-white shadow-lg">

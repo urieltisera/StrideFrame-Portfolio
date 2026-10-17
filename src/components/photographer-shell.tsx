@@ -28,7 +28,7 @@ export function PhotographerShell({ children, active = "dashboard", accountName 
     }`;
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--text-primary)]">
+    <div className="sf-photographer-shell min-h-screen bg-[var(--background)] text-[var(--text-primary)]">
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-60 flex-col bg-[var(--ink)] px-5 py-6 text-white lg:flex">
         <BrandLogo href="/photographer/dashboard" light />
         <p className="mt-2 text-xs text-white/45">Photographer workspace</p>
@@ -60,7 +60,7 @@ export function PhotographerShell({ children, active = "dashboard", accountName 
           </nav>
         </div>
       </div>
-      <main className="min-h-screen lg:pl-60">
+      <main className="sf-page-reveal min-h-screen lg:pl-60">
         <div className="mx-auto max-w-7xl p-5 sm:p-6 md:p-8 lg:p-10">{children}</div>
       </main>
     </div>
