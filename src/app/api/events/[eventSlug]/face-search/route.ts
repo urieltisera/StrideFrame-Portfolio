@@ -14,6 +14,7 @@ import {
   withFaceSearchTimeout,
 } from "@/lib/face-security";
 import { resolveEffectivePhotoPrice } from "@/lib/pricing";
+import { isInternalLibraryEvent } from "@/lib/upload-workflow";
 
 export async function GET() {
   const availability = getFaceSearchAvailability();
@@ -51,8 +52,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ eve
   }
   let providerWork: Promise<Array<{ id: string; photoId: string; distance: number }>> | undefined;
   try {
-    const event = await prisma.event.findFirst({ where: { slug: eventSlug, status: "PUBLISHED" }, select: { id: true } });
-    if (!event) return new NextResponse("Not found", { status: 404 });
+    const event = await prisma.event.findFirst({ where: { slug: eventSlug, status: "PUBLISHED" }, select: { id: true, photographerId: true, slug: true } });
+    if (!event || isInternalLibraryEvent(event, event.photographerId)) return new NextResponse("Not found", { status: 404 });
     const file = form.get("selfie");
     if (!(file instanceof File)) return NextResponse.json({ error: "Please upload a selfie" }, { status: 400 });
     providerWork = (async () => {

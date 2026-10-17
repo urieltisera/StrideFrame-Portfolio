@@ -1,16 +1,18 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/button";
 import { Card } from "@/components/card";
 import { CustomerShell } from "@/components/customer-shell";
 import { EmptyState } from "@/components/feedback";
 import { prisma } from "@/lib/prisma";
 import { albumDisplayTitle } from "@/lib/album-labels";
+import { isInternalLibraryEvent } from "@/lib/upload-workflow";
 
 export default async function EventPage({ params }: { params: Promise<{ eventSlug: string }> }) {
   const { eventSlug } = await params;
   const event = await prisma.event.findFirst({ where: { slug: eventSlug, status: "PUBLISHED" }, include: { photographer: { select: { name: true, publicSlug: true, publicProfileEnabled: true } }, albums: { where: { status: "PUBLISHED" }, orderBy: { createdAt: "asc" }, include: { photos: { where: { status: "PUBLISHED" }, take: 4, orderBy: { createdAt: "asc" } } } } } });
   if (!event) notFound();
+  if (isInternalLibraryEvent(event, event.photographerId)) redirect("/");
   event.albums = event.albums.filter((album) => album.slug !== "individual-photos");
   const heroPhoto = event.albums[0]?.photos[0];
   return <CustomerShell eventName={event.title}>
