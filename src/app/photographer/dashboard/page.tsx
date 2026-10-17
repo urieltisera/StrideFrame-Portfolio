@@ -37,7 +37,7 @@ export default async function Dashboard() {
         eyebrow="Photographer workspace"
         title={`Welcome, ${person.name}.`}
         description="Keep your event work moving from first upload to public gallery."
-        action={<Link href="#new-event"><Button type="button">Create event</Button></Link>}
+        action={<div className="flex flex-wrap gap-2"><Link href="/photographer/upload"><Button type="button">Upload photos</Button></Link><Link href="#new-event"><Button type="button" variant="secondary">Create event</Button></Link></div>}
       />
 
       <section aria-label="Business overview" className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

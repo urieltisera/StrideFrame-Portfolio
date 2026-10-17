@@ -5,18 +5,19 @@ import { Icon, type IconName } from "./icon";
 
 type PhotographerShellProps = {
   children: ReactNode;
-  active?: "dashboard" | "events" | "settings";
+  active?: "dashboard" | "events" | "settings" | "upload";
   accountName?: string;
 };
 
-const navigation: Array<{ label: string; href: string; active: "dashboard" | "events" | "settings"; icon: IconName }> = [
+const navigation: Array<{ label: string; href: string; active: "dashboard" | "events" | "settings" | "upload"; icon: IconName }> = [
+  { label: "Upload photos", href: "/photographer/upload", active: "upload", icon: "upload" },
   { label: "Dashboard", href: "/photographer/dashboard", active: "dashboard", icon: "grid" },
   { label: "Events", href: "/photographer/dashboard#events", active: "events", icon: "calendar" },
   { label: "Payment settings", href: "/photographer/settings/payments", active: "settings", icon: "card" },
 ];
 
 export function PhotographerShell({ children, active = "dashboard", accountName }: PhotographerShellProps) {
-  const navItem = (item: "dashboard" | "events" | "settings") =>
+  const navItem = (item: "dashboard" | "events" | "settings" | "upload") =>
     `flex items-center gap-3 rounded-[var(--radius-medium)] px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
       active === item
         ? "bg-white/12 text-white"
@@ -28,14 +29,15 @@ export function PhotographerShell({ children, active = "dashboard", accountName 
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-60 flex-col bg-[var(--ink)] px-5 py-6 text-white lg:flex">
         <BrandLogo href="/photographer/dashboard" light />
         <p className="mt-2 text-xs text-white/45">Photographer workspace</p>
+        <Link href="/photographer/upload" className="mt-8 flex items-center justify-center gap-2 rounded-[var(--radius-small)] bg-[var(--orange)] px-3 py-3 text-sm font-bold text-white transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--orange)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ink)]"><Icon name="upload" size={18} />Upload photos</Link>
         <div className="mt-10 grid gap-7">
           <nav aria-label="Photographer navigation" className="grid gap-1">
             <p className="sf-label mb-2 px-3 text-white/40">Workspace</p>
-            {navigation.slice(0, 2).map((item) => <Link key={item.href} className={navItem(item.active)} href={item.href}><Icon name={item.icon} size={18} />{item.label}</Link>)}
+            {navigation.slice(1, 3).map((item) => <Link key={item.href} className={navItem(item.active)} href={item.href}><Icon name={item.icon} size={18} />{item.label}</Link>)}
           </nav>
           <nav aria-label="Business navigation" className="grid gap-1">
             <p className="sf-label mb-2 px-3 text-white/40">Business</p>
-            {navigation.slice(2).map((item) => <Link key={item.href} className={navItem(item.active)} href={item.href}><Icon name={item.icon} size={18} />{item.label}</Link>)}
+            {navigation.slice(3).map((item) => <Link key={item.href} className={navItem(item.active)} href={item.href}><Icon name={item.icon} size={18} />{item.label}</Link>)}
           </nav>
         </div>
         <div className="mt-auto border-t border-white/10 pt-5">

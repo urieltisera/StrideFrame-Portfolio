@@ -6,6 +6,8 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createPhoto, deletePhoto } from "../../src/lib/photos";
+import { createDraftEvent } from "../../src/lib/events";
+import { getOrCreateDefaultAlbum } from "../../src/lib/upload-workflow";
 import { LocalStorageProvider } from "../../src/lib/storage";
 import { createPendingOrder } from "../../src/lib/orders";
 import { createDownloadGrant, authorizeDownload, revokeOrderDownloads, downloadTokenHash } from "../../src/lib/downloads";
@@ -40,6 +42,21 @@ suite("PostgreSQL critical flows", () => {
     expect(await db.event.findFirst({where:{slug:"race",status:"PUBLISHED"},include:{albums:{where:{status:"PUBLISHED"}}}})).toMatchObject({title:"Race",albums:[{title:"Finish"}]});
     await db.album.update({where:{id:album.id},data:{status:"DRAFT"}});
     expect((await db.event.findFirst({where:{slug:"race",status:"PUBLISHED"},include:{albums:{where:{status:"PUBLISHED"}}}}))?.albums).toHaveLength(0);
+  });
+  it("creates collision-safe draft events and reuses the owned default upload album", async () => {
+    const owner = await db.photographer.create({ data: { email: "upload-owner@example.com", name: "Upload Owner", passwordHash: "x" } });
+    const first = await createDraftEvent({ photographerId: owner.id, title: "Race Day", description: "Saturday" });
+    const second = await createDraftEvent({ photographerId: owner.id, title: "Race Day" });
+    expect(first.slug).toBe("race-day");
+    expect(second.slug).toBe("race-day-2");
+    expect(first.status).toBe("DRAFT");
+    expect(second.status).toBe("DRAFT");
+    const album = await getOrCreateDefaultAlbum({ eventId: first.id, photographerId: owner.id, priceCents: 500 });
+    const reused = await getOrCreateDefaultAlbum({ eventId: first.id, photographerId: owner.id, priceCents: 800 });
+    expect(reused.id).toBe(album.id);
+    expect(reused.slug).toBe("event-photos");
+    expect(reused.priceCents).toBe(800);
+    await expect(getOrCreateDefaultAlbum({ eventId: first.id, photographerId: "not-owner", priceCents: 500 })).rejects.toThrow("not owned");
   });
   it("runs the owner-only photo pipeline and keeps originals outside public storage", async () => {
     const directory=await fs.mkdtemp(path.join(os.tmpdir(),"sportpix-integration-")); const provider=new LocalStorageProvider(directory);
