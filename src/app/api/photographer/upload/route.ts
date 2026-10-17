@@ -4,7 +4,7 @@ import { createDraftEvent } from "@/lib/events";
 import { createPhoto, validatePriceCents, validateUploadBatch } from "@/lib/photos";
 import { dollarsToCents } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateDefaultAlbum, getOwnedUploadAlbum } from "@/lib/upload-workflow";
+import { getOrCreateDefaultAlbum, getOrCreateInternalLibraryEvent, getOwnedUploadAlbum } from "@/lib/upload-workflow";
 
 export const runtime = "nodejs";
 
@@ -36,10 +36,12 @@ export async function POST(request: Request) {
     const requestedEventId = String(form.get("eventId") || "");
     const event = requestedEventId === "__new__"
       ? await createDraftEvent({ photographerId: photographer.id, title: form.get("eventTitle"), description: form.get("eventDescription") })
-      : await prisma.event.findFirst({ where: { id: requestedEventId, photographerId: photographer.id } }).then((existing) => {
+      : requestedEventId
+        ? await prisma.event.findFirst({ where: { id: requestedEventId, photographerId: photographer.id } }).then((existing) => {
           if (!existing) throw new Error("Event not found or not owned");
           return existing;
-        });
+        })
+        : await getOrCreateInternalLibraryEvent(photographer.id);
 
     const requestedAlbumId = String(form.get("albumId") || "");
     const album = requestedAlbumId

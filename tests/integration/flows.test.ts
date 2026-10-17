@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { createPhoto, deletePhoto } from "../../src/lib/photos";
 import { createDraftEvent } from "../../src/lib/events";
-import { getOrCreateDefaultAlbum } from "../../src/lib/upload-workflow";
+import { getOrCreateDefaultAlbum, getOrCreateInternalLibraryEvent, internalLibraryEventSlug } from "../../src/lib/upload-workflow";
 import { publishAlbumForPhotographer } from "../../src/lib/album-publication";
 import { LocalStorageProvider } from "../../src/lib/storage";
 import { createPendingOrder } from "../../src/lib/orders";
@@ -59,6 +59,41 @@ suite("PostgreSQL critical flows", () => {
     expect(reused.slug).toBe("event-photos");
     expect(reused.priceCents).toBe(800);
     await expect(getOrCreateDefaultAlbum({ eventId: first.id, photographerId: "not-owner", priceCents: 500 })).rejects.toThrow("not owned");
+  });
+  it("resolves one private library context per photographer without cross-owner reuse", async () => {
+    const [owner, other] = await Promise.all([
+      db.photographer.create({ data: { email: "library-owner@example.com", name: "Library Owner", passwordHash: "x" } }),
+      db.photographer.create({ data: { email: "library-other@example.com", name: "Library Other", passwordHash: "x" } }),
+    ]);
+    const first = await getOrCreateInternalLibraryEvent(owner.id);
+    const reused = await getOrCreateInternalLibraryEvent(owner.id);
+    const separate = await getOrCreateInternalLibraryEvent(other.id);
+    expect(reused.id).toBe(first.id);
+    expect(first.slug).toBe(internalLibraryEventSlug(owner.id));
+    expect(first.slug).not.toBe(separate.slug);
+    expect(first.photographerId).toBe(owner.id);
+    expect(first.status).toBe("DRAFT");
+    expect(first.title).toBe("Private library");
+    expect(await db.event.findFirst({ where: { id: first.id, status: "PUBLISHED" } })).toBeNull();
+    await expect(getOrCreateDefaultAlbum({ eventId: first.id, photographerId: other.id, priceCents: 500 })).rejects.toThrow("not owned");
+  });
+  it("keeps the private library upload relationship and face-search event scope intact", async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "sportpix-library-"));
+    const provider = new LocalStorageProvider(directory);
+    const owner = await db.photographer.create({ data: { email: "library-upload@example.com", name: "Library Upload", passwordHash: "x" } });
+    try {
+      const event = await getOrCreateInternalLibraryEvent(owner.id);
+      const album = await getOrCreateDefaultAlbum({ eventId: event.id, photographerId: owner.id, priceCents: 500 });
+      const bytes = await sharp({ create: { width: 32, height: 32, channels: 3, background: "#ff5a1f" } }).jpeg().toBuffer();
+      const photo = await createPhoto({ photographerId: owner.id, albumId: album.id, file: new File([bytes], "library.jpg", { type: "image/jpeg" }), provider });
+      expect(photo.albumId).toBe(album.id);
+      expect((await db.album.findUnique({ where: { id: album.id }, select: { eventId: true } }))?.eventId).toBe(event.id);
+      expect(await db.photoFace.findFirst({ where: { photoId: photo.id, eventId: { not: event.id } } })).toBeNull();
+      expect(await db.event.findUnique({ where: { id: event.id }, select: { status: true } })).toMatchObject({ status: "DRAFT" });
+      await deletePhoto(photo.id, owner.id, provider);
+    } finally {
+      await fs.rm(directory, { recursive: true, force: true });
+    }
   });
   it("runs the owner-only photo pipeline and keeps originals outside public storage", async () => {
     const directory=await fs.mkdtemp(path.join(os.tmpdir(),"sportpix-integration-")); const provider=new LocalStorageProvider(directory);
