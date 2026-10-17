@@ -12,6 +12,7 @@ import { publishAlbumForPhotographer } from "../../src/lib/album-publication";
 import { LocalStorageProvider } from "../../src/lib/storage";
 import { createPendingOrder } from "../../src/lib/orders";
 import { createDownloadGrant, authorizeDownload, revokeOrderDownloads, downloadTokenHash } from "../../src/lib/downloads";
+import { GET as previewGET } from "../../src/app/api/previews/[...key]/route";
 
 const db = new PrismaClient();
 const hasDatabase = Boolean(process.env.TEST_DATABASE_URL);
@@ -65,6 +66,16 @@ suite("PostgreSQL critical flows", () => {
     const event=await db.event.create({data:{photographerId:owner.id,title:"Photo Event",slug:"photo-event",accessCode:"photo-code",status:"PUBLISHED"}}); const album=await db.album.create({data:{photographerId:owner.id,eventId:event.id,title:"Album",slug:"album",status:"PUBLISHED"}});
     const bytes=await sharp({create:{width:64,height:64,channels:3,background:"#229977"}}).jpeg().toBuffer(); const file=new File([bytes],"photo.jpg",{type:"image/jpeg"});
     const photo=await createPhoto({photographerId:owner.id,albumId:album.id,file,priceOverrideCents:1250,provider}); expect(photo.priceOverrideCents).toBe(1250); expect(photo.currency).toBe("USD"); await expect(createPhoto({photographerId:other.id,albumId:album.id,file,priceOverrideCents:1250,provider})).rejects.toThrow("not owned"); await expect(createPhoto({photographerId:owner.id,albumId:album.id,file:new File(["bad"],"bad.txt",{type:"text/plain"}),priceOverrideCents:1250,provider})).rejects.toThrow("Unsupported"); await expect(fs.access(path.join(directory,"originals",photo.originalKey))).resolves.toBeUndefined(); await deletePhoto(photo.id,owner.id,provider); await expect(db.photo.findUnique({where:{id:photo.id}})).resolves.toBeNull(); await fs.rm(directory,{recursive:true,force:true});
+  });
+  it("serves only published local previews and never exposes missing/private files", async () => {
+    const directory=await fs.mkdtemp(path.join(os.tmpdir(),"sportpix-preview-")); const previousDirectory=process.env.STORAGE_LOCAL_DIR; const previousProvider=process.env.STORAGE_PROVIDER; process.env.STORAGE_LOCAL_DIR=directory; delete process.env.STORAGE_PROVIDER;
+    try {
+      const owner=await db.photographer.create({data:{email:"preview-owner@example.com",name:"Preview Owner",passwordHash:"x"}}); const event=await db.event.create({data:{photographerId:owner.id,title:"Preview Event",slug:"preview-event",accessCode:"preview-code",status:"PUBLISHED"}}); const album=await db.album.create({data:{photographerId:owner.id,eventId:event.id,title:"Preview Album",slug:"preview-album",status:"PUBLISHED"}}); const bytes=await sharp({create:{width:32,height:32,channels:3,background:"#ff5a1f"}}).webp().toBuffer(); const photo=await createPhoto({photographerId:owner.id,albumId:album.id,file:new File([bytes],"preview.webp",{type:"image/webp"}),priceOverrideCents:500,provider:new LocalStorageProvider(directory)});
+      const published=await previewGET(new Request("http://localhost/api/previews/"+photo.previewKey),{params:Promise.resolve({key:photo.previewKey.split("/")})}); expect(published.status).toBe(200); expect(published.headers.get("content-type")).toContain("image/webp");
+      await db.photo.update({where:{id:photo.id},data:{status:"DRAFT"}}); const draft=await previewGET(new Request("http://localhost/api/previews/"+photo.previewKey),{params:Promise.resolve({key:photo.previewKey.split("/")})}); expect(draft.status).toBe(404);
+      await db.photo.update({where:{id:photo.id},data:{status:"PUBLISHED",previewKey:"missing/preview.webp"}}); const missing=await previewGET(new Request("http://localhost/api/previews/missing/preview.webp"),{params:Promise.resolve({key:["missing","preview.webp"]})}); expect(missing.status).toBe(404);
+      await db.photo.update({where:{id:photo.id},data:{previewKey:photo.previewKey}}); await db.album.update({where:{id:album.id},data:{status:"DRAFT"}}); const privateAlbum=await previewGET(new Request("http://localhost/api/previews/"+photo.previewKey),{params:Promise.resolve({key:photo.previewKey.split("/")})}); expect(privateAlbum.status).toBe(404);
+    } finally { previousDirectory===undefined?delete process.env.STORAGE_LOCAL_DIR:process.env.STORAGE_LOCAL_DIR=previousDirectory; previousProvider===undefined?delete process.env.STORAGE_PROVIDER:process.env.STORAGE_PROVIDER=previousProvider; await fs.rm(directory,{recursive:true,force:true}); }
   });
   it("creates canonical QR links and enforces publication during resolution", async () => {
     const [owner,other]=await Promise.all([db.photographer.create({data:{email:"qr-owner@example.com",name:"Owner",passwordHash:"x"}}),db.photographer.create({data:{email:"qr-other@example.com",name:"Other",passwordHash:"x"}})]);

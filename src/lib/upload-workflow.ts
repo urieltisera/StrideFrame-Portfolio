@@ -1,7 +1,7 @@
 import { prisma } from "./prisma";
+import { DEFAULT_ALBUM_SLUG, DEFAULT_ALBUM_TITLE } from "./album-labels";
 
-export const DEFAULT_ALBUM_SLUG = "event-photos";
-export const DEFAULT_ALBUM_TITLE = "Event photos";
+export { DEFAULT_ALBUM_SLUG, DEFAULT_ALBUM_TITLE };
 
 export async function getOrCreateDefaultAlbum({ eventId, photographerId, priceCents }: { eventId: string; photographerId: string; priceCents: number }) {
   const event = await prisma.event.findFirst({ where: { id: eventId, photographerId }, select: { id: true, status: true } });

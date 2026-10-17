@@ -7,8 +7,9 @@ import { Button } from "@/components/button";
 import { Card } from "@/components/card";
 import { Input } from "@/components/form-fields";
 import { MAX_PHOTO_BYTES, MAX_UPLOAD_BYTES, MAX_PHOTOS_PER_UPLOAD, supportedMimeTypes } from "@/lib/photo-config";
+import { albumDisplayTitle, isDefaultAlbum } from "@/lib/album-labels";
 
-type EventOption = { id: string; title: string; status: string; albums: Array<{ id: string; title: string; priceCents: number; status: string }> };
+type EventOption = { id: string; title: string; status: string; albums: Array<{ id: string; title: string; slug: string; priceCents: number; status: string }> };
 
 export function UploadWorkflow({ events }: { events: EventOption[] }) {
   const router = useRouter();
@@ -20,7 +21,7 @@ export function UploadWorkflow({ events }: { events: EventOption[] }) {
   const [message, setMessage] = useState("");
   const selectedEvent = events.find((event) => event.id === eventChoice);
   const selectedAlbum = selectedEvent?.albums.find((album) => album.id === albumId);
-  const albumOptions = events.flatMap((event) => event.albums.filter((album) => album.title !== "Individual photos").map((album) => ({ ...album, eventId: event.id, eventTitle: event.title })));
+  const albumOptions = events.flatMap((event) => event.albums.filter((album) => album.title !== "Individual photos" && album.slug !== "individual-photos").map((album) => ({ ...album, eventId: event.id, eventTitle: event.title })));
   const totalBytes = useMemo(() => files.reduce((total, file) => total + file.size, 0), [files]);
   const totalLabel = `${(totalBytes / 1024 / 1024).toFixed(1)} MB`;
 
@@ -34,7 +35,7 @@ export function UploadWorkflow({ events }: { events: EventOption[] }) {
     setEventChoice(value);
     setAlbumId("");
     const event = events.find((item) => item.id === value);
-    const album = event?.albums.find((item) => item.title === "Event photos");
+    const album = event?.albums.find(isDefaultAlbum);
     setPrice(album ? (album.priceCents / 100).toFixed(2) : "5.00");
   }
 
@@ -82,10 +83,10 @@ export function UploadWorkflow({ events }: { events: EventOption[] }) {
     </Card>
     <Card className="p-6 md:p-8">
       <p className="sf-label text-[var(--accent)]">Organization</p><h2 className="sf-section-title mt-2">Album <span className="font-normal text-[var(--text-muted)]">(optional)</span></h2><p className="sf-body-secondary mt-2">Choose a collection or keep these photos in General photos.</p>
-      <label htmlFor="upload-album" className="mt-5 grid gap-2"><span className="sf-label">Album</span><select id="upload-album" name="albumId" value={albumId} onChange={(event) => selectAlbum(event.target.value)} className="min-h-11 rounded-[var(--radius-small)] border border-[var(--border)] bg-[var(--surface)] px-3 text-[var(--text-primary)]"><option value="">General photos{selectedEvent ? ` · ${selectedEvent.title}` : ""}</option>{albumOptions.map((album) => <option key={album.id} value={album.id}>{album.title} · {album.eventTitle}</option>)}</select></label>
+      <label htmlFor="upload-album" className="mt-5 grid gap-2"><span className="sf-label">Album</span><select id="upload-album" name="albumId" value={albumId} onChange={(event) => selectAlbum(event.target.value)} className="min-h-11 rounded-[var(--radius-small)] border border-[var(--border)] bg-[var(--surface)] px-3 text-[var(--text-primary)]"><option value="">General photos{selectedEvent ? ` · ${selectedEvent.title}` : ""}</option>{albumOptions.map((album) => <option key={album.id} value={album.id}>{albumDisplayTitle(album)} · {album.eventTitle}</option>)}</select></label>
       <div className="mt-5 border-t border-[var(--border)] pt-5"><label htmlFor="upload-event" className="grid gap-2"><span className="sf-label">Gallery context</span><select id="upload-event" name="eventId" value={eventChoice} onChange={(event) => selectEvent(event.target.value)} className="min-h-11 rounded-[var(--radius-small)] border border-[var(--border)] bg-[var(--surface)] px-3 text-[var(--text-primary)]"><option value="__new__">Create a new gallery</option>{events.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><p className="sf-caption mt-2">Used for secure routing when General photos is selected. You do not need to publish the gallery before uploading.</p></div>
       {eventChoice === "__new__" && <div className="mt-5 grid gap-4 border-t border-[var(--border)] pt-5 md:grid-cols-2"><Input id="event-title" name="eventTitle" label="New gallery name" required placeholder="Saturday race" /><label htmlFor="event-description" className="grid gap-2"><span className="sf-label">Description <span className="font-normal normal-case tracking-normal">(optional)</span></span><textarea id="event-description" name="eventDescription" rows={2} className="min-h-11 rounded-[var(--radius-small)] border border-[var(--border)] bg-[var(--surface)] p-3 text-[var(--text-primary)] placeholder:text-[var(--text-muted)]" placeholder="A short description" /></label><p className="sf-caption md:col-span-2">The gallery stays private as a draft until you publish it.</p></div>}
     </Card>
-    <Card className="p-6 md:p-8"><div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"><Input id="upload-price" name="priceDollars" label={`Price per photo (USD)${selectedAlbum ? ` · ${selectedAlbum.title}` : ""}`} required inputMode="decimal" pattern="^\d+(\.\d{1,2})?$" value={price} onChange={(event) => setPrice(event.target.value)} /><div><Button type="submit" loading={busy} disabled={busy || files.length === 0}>Upload photos</Button></div></div><p className="sf-caption mt-4">Photos inherit this price. Individual overrides can be added later from album management.</p>{message && <p role="status" className="mt-4 text-sm text-[var(--error)]">{message}</p>}</Card>
+    <Card className="p-6 md:p-8"><div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end"><Input id="upload-price" name="priceDollars" label={`Price per photo (USD)${selectedAlbum ? ` · ${albumDisplayTitle(selectedAlbum)}` : ""}`} required inputMode="decimal" pattern="^\d+(\.\d{1,2})?$" value={price} onChange={(event) => setPrice(event.target.value)} /><div><Button type="submit" loading={busy} disabled={busy || files.length === 0}>Upload photos</Button></div></div><p className="sf-caption mt-4">Photos inherit this price. Individual overrides can be added later from album management.</p>{message && <p role="status" className="mt-4 text-sm text-[var(--error)]">{message}</p>}</Card>
   </form>;
 }

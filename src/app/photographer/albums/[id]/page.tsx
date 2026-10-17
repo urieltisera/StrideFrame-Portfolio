@@ -11,6 +11,7 @@ import { createAlbumQr, publishAlbum, removePhoto, toggleQr, unpublishAlbum, upd
 import { UploadForm } from "./upload-form";
 import { formatUsd } from "@/lib/money";
 import { qrUrl } from "@/lib/qr";
+import { albumDisplayTitle } from "@/lib/album-labels";
 
 export default async function AlbumPage({ params }: { params: Promise<{ id: string }> }) {
   const person = await getCurrentPhotographer();
@@ -23,7 +24,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ id: stri
   return (
     <PhotographerShell active="albums" accountName={person.name}>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3"><Link href={`/photographer/events/${album.eventId}`} className="sf-body-secondary hover:text-[var(--text-primary)]">← Back to {album.event.title}</Link><Link href={`/e/${album.event.slug}/${album.slug}`}><Button type="button" variant="secondary">View public album</Button></Link></div>
-      <PageHeader eyebrow="Album" title={album.title} description={album.description || "Manage photos, pricing and public access for this album."} action={<div className="flex flex-wrap items-center gap-2"><StatusBadge status={album.status} />{album.status === "PUBLISHED" ? <form action={unpublishAlbum}><input type="hidden" name="albumId" value={album.id} /><Button type="submit" variant="secondary">Unpublish album</Button></form> : <form action={publishAlbum}><input type="hidden" name="albumId" value={album.id} /><Button type="submit">Publish album</Button></form>}</div>} />
+      <PageHeader eyebrow="Album" title={albumDisplayTitle(album)} description={album.description || "Manage photos, pricing and public access for this album."} action={<div className="flex flex-wrap items-center gap-2"><StatusBadge status={album.status} />{album.status === "PUBLISHED" ? <form action={unpublishAlbum}><input type="hidden" name="albumId" value={album.id} /><Button type="submit" variant="secondary">Unpublish album</Button></form> : <form action={publishAlbum}><input type="hidden" name="albumId" value={album.id} /><Button type="submit">Publish album</Button></form>}</div>} />
 
       <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card className="p-6 md:p-7"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="sf-label text-[var(--accent)]">Photo library</p><h2 className="sf-section-title mt-2">Upload photos</h2><p className="sf-body-secondary mt-2">Originals remain private. Public galleries use protected previews.</p></div><div className="text-right"><p className="text-3xl font-black">{album.photos.length}</p><p className="sf-caption">photos</p></div></div><div className="mt-6"><UploadForm albumId={album.id} eventId={album.eventId} albumPriceCents={album.priceCents} action={uploadPhotos} /></div></Card>
