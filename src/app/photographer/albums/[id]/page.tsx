@@ -14,10 +14,11 @@ import { qrUrl } from "@/lib/qr";
 import { albumDisplayTitle } from "@/lib/album-labels";
 import { CopyProfileLink } from "@/app/photographer/dashboard/profile-link-actions";
 
-export default async function AlbumPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AlbumPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ error?: string }> }) {
   const person = await getCurrentPhotographer();
   if (!person) redirect("/photographer/login");
   const { id } = await params;
+  const query = searchParams ? await searchParams : {};
   const album = await prisma.album.findFirst({ where: { id, photographerId: person.id }, include: { event: true, photos: true, qrLinks: true } });
   if (!album) notFound();
   const qr = album.qrLinks[0];
@@ -28,7 +29,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ id: stri
       <PageHeader eyebrow="Album" title={albumDisplayTitle(album)} description={album.description || "Manage photos, pricing and public access for this album."} action={<div className="flex flex-wrap items-center gap-2"><StatusBadge status={album.status} />{album.status !== "PUBLISHED" && <form action={publishAlbum}><input type="hidden" name="albumId" value={album.id} /><Button type="submit">Publish</Button></form>}</div>} />
 
       <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <Card className="p-6 md:p-7"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="sf-label text-[var(--accent)]">Photo library</p><h2 className="sf-section-title mt-2">Upload photos</h2><p className="sf-body-secondary mt-2">Originals remain private. Public galleries use protected previews.</p></div><div className="text-right"><p className="text-3xl font-black">{album.photos.length}</p><p className="sf-caption">photos</p></div></div><div className="mt-6"><UploadForm albumId={album.id} eventId={album.eventId} albumPriceCents={album.priceCents} action={uploadPhotos} /></div></Card>
+        <Card className="p-6 md:p-7"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="sf-label text-[var(--accent)]">Photo library</p><h2 className="sf-section-title mt-2">Upload photos</h2><p className="sf-body-secondary mt-2">Originals remain private. Public galleries use protected previews.</p></div><div className="text-right"><p className="text-3xl font-black">{album.photos.length}</p><p className="sf-caption">photos</p></div></div>{query.error && <p role="alert" className="mt-5 rounded-[var(--radius-medium)] border border-[var(--error)]/40 bg-[var(--error)]/10 p-3 text-sm font-semibold text-[var(--error)]">{query.error === "album-not-found" ? "This album is unavailable." : decodeURIComponent(query.error)}</p>}<div className="mt-6"><UploadForm albumId={album.id} albumPriceCents={album.priceCents} action={uploadPhotos} /></div></Card>
 
         <Card className="p-6 md:p-7"><p className="sf-label text-[var(--accent)]">Publication & sharing</p><h2 className="sf-section-title mt-2">{album.status === "PUBLISHED" ? "This album is public" : "This album is private"}</h2><p className="sf-body-secondary mt-2">{album.status === "PUBLISHED" ? "Published photos are available in the public gallery. Draft photos remain private." : "Publish this album when you are ready to share its published photos."}</p>{album.status === "PUBLISHED" && <>{qr ? <div className="mt-5 rounded-[var(--radius-medium)] border border-[var(--border)] bg-[var(--surface-elevated)] p-4"><StatusBadge status={qr.status} /><code className="mt-3 block break-all text-xs text-[var(--text-secondary)]">{qrUrl(qr.code)}</code></div> : <p className="mt-5 text-sm text-[var(--text-secondary)]">A share link is not available for this legacy album yet.</p>}<div className="mt-4 flex flex-wrap gap-2">{qr && <><CopyProfileLink url={qrUrl(qr.code)} /><a href={`/e/${album.event.slug}/${album.slug}`}><Button type="button" variant="secondary">View public album</Button></a><a href={`/api/qr/${qr.code}`} download><Button type="button" variant="secondary">Download QR</Button></a></>}</div></>}</Card>
       </div>
