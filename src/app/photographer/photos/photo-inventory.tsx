@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { Button } from "@/components/button";
 import { Card } from "@/components/card";
 import { StatusBadge } from "@/components/badge";
 import { SafeImage } from "@/components/safe-image";
+import { Input } from "@/components/form-fields";
+import { createAlbumFromSelection } from "@/app/photographer/actions";
 
 export type InventoryPhoto = {
   id: string;
@@ -19,12 +21,12 @@ export type InventoryPhoto = {
 
 export function PhotoInventory({ photos }: { photos: InventoryPhoto[] }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [message, setMessage] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [state, formAction, pending] = useActionState(createAlbumFromSelection, { error: "" });
   const visibleIds = useMemo(() => photos.map((photo) => photo.id), [photos]);
   const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
 
   function togglePhoto(id: string) {
-    setMessage("");
     setSelectedIds((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
@@ -34,7 +36,6 @@ export function PhotoInventory({ photos }: { photos: InventoryPhoto[] }) {
   }
 
   function toggleAll() {
-    setMessage("");
     setSelectedIds(allSelected ? new Set() : new Set(visibleIds));
   }
 
@@ -48,11 +49,11 @@ export function PhotoInventory({ photos }: { photos: InventoryPhoto[] }) {
         {selectedIds.size > 0 && <span className="text-sm text-[var(--text-secondary)]">{selectedIds.size} selected</span>}
       </div>
       {selectedIds.size > 0 && <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" onClick={() => setMessage("Album creation is the next step. Your selected photos are ready.")}>Create album</Button>
-        <Button type="button" variant="ghost" onClick={() => { setSelectedIds(new Set()); setMessage(""); }}>Clear selection</Button>
+        <Button type="button" onClick={() => setCreateOpen(true)}>Create album</Button>
+        <Button type="button" variant="ghost" onClick={() => setSelectedIds(new Set())}>Clear selection</Button>
       </div>}
     </div>
-    {message && <p role="status" className="mb-5 rounded-[var(--radius-medium)] border border-[var(--border-strong)] bg-[var(--surface-interactive)] p-4 text-sm font-semibold">{message}</p>}
+    {createOpen && <div className="mb-5 rounded-[var(--radius-large)] border border-[var(--border-strong)] bg-[var(--surface)] p-6 shadow-[var(--shadow-elevated)]" role="dialog" aria-modal="true" aria-labelledby="create-album-title"><div className="flex items-start justify-between gap-4"><div><p className="sf-kicker">{selectedIds.size} selected</p><h2 id="create-album-title" className="sf-section-title mt-2">Create album</h2><p className="sf-body-secondary mt-2">Give these photos a name and set their album price.</p></div><Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button></div><form action={formAction} className="mt-6 grid gap-5 sm:grid-cols-[minmax(0,1fr)_220px_auto] sm:items-end">{[...selectedIds].map((id) => <input key={id} type="hidden" name="photoIds" value={id} />)}<Input id="create-album-name" name="name" label="Album name" required minLength={2} maxLength={120} autoFocus /><Input id="create-album-price" name="priceDollars" label="Price per photo (USD)" required inputMode="decimal" pattern="^\d+(\.\d{1,2})?$" defaultValue="5.00" /><Button type="submit" loading={pending}>Create</Button></form>{state.error && <p role="alert" className="mt-4 text-sm font-semibold text-[var(--error)]">{state.error}</p>}</div>}
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
       {photos.map((photo) => {
         const selected = selectedIds.has(photo.id);

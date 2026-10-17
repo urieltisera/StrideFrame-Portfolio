@@ -1,5 +1,6 @@
 import { beforeAll, afterAll, beforeEach, describe, expect, it } from "vitest";
 import bcrypt from "bcryptjs";
+import crypto from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import sharp from "sharp";
 import { promises as fs } from "node:fs";
@@ -8,6 +9,7 @@ import path from "node:path";
 import { createPhoto, deletePhoto } from "../../src/lib/photos";
 import { createDraftEvent } from "../../src/lib/events";
 import { getOrCreateDefaultAlbum, getOrCreateInternalLibraryEvent, internalLibraryEventSlug } from "../../src/lib/upload-workflow";
+import { createAlbumFromSelectedPhotos } from "../../src/lib/album-creation";
 import { publishAlbumForPhotographer } from "../../src/lib/album-publication";
 import { LocalStorageProvider } from "../../src/lib/storage";
 import { createPendingOrder } from "../../src/lib/orders";
@@ -94,6 +96,37 @@ suite("PostgreSQL critical flows", () => {
     } finally {
       await fs.rm(directory, { recursive: true, force: true });
     }
+  });
+  it("creates a private album from selected library photos and synchronizes FaceSearch album metadata", async () => {
+    const [owner, other] = await Promise.all([
+      db.photographer.create({ data: { email: "album-create-owner@example.com", name: "Album Owner", passwordHash: "x" } }),
+      db.photographer.create({ data: { email: "album-create-other@example.com", name: "Album Other", passwordHash: "x" } }),
+    ]);
+    const library = await getOrCreateInternalLibraryEvent(owner.id);
+    const defaultAlbum = await getOrCreateDefaultAlbum({ eventId: library.id, photographerId: owner.id, priceCents: 500 });
+    const bytes = await sharp({ create: { width: 16, height: 16, channels: 3, background: "#132238" } }).jpeg().toBuffer();
+    const photos = await Promise.all([
+      db.photo.create({ data: { albumId: defaultAlbum.id, originalKey: "private/a", previewKey: "public/a", originalFilename: "a.jpg", mimeType: "image/jpeg", fileSize: bytes.length, priceOverrideCents: null, status: "PUBLISHED" } }),
+      db.photo.create({ data: { albumId: defaultAlbum.id, originalKey: "private/b", previewKey: "public/b", originalFilename: "b.jpg", mimeType: "image/jpeg", fileSize: bytes.length, priceOverrideCents: 800, status: "DRAFT" } }),
+      db.photo.create({ data: { albumId: defaultAlbum.id, originalKey: "private/c", previewKey: "public/c", originalFilename: "c.jpg", mimeType: "image/jpeg", fileSize: bytes.length, priceOverrideCents: null, status: "PUBLISHED" } }),
+    ]);
+    const compatibilityKey = "album-create-test";
+    await db.$executeRawUnsafe(`INSERT INTO "PhotoFace" ("id","photoId","eventId","albumId","embedding","detectionConfidence","boundingBox","faceIndex","providerId","modelId","modelVersion","embeddingFormatVersion","embeddingDimension","similarityMetric","compatibilityKey","createdAt") VALUES ($1,$2,$3,$4,array_fill(0::real, ARRAY[512])::vector,$5,$6::jsonb,$7,$8,$9,$10,$11,$12,$13,$14,NOW())`, crypto.randomUUID(), photos[0].id, library.id, defaultAlbum.id, 0.9, JSON.stringify({ x: 1 }), 0, "test", "test", "test", "test", 512, "COSINE", compatibilityKey);
+    const created = await createAlbumFromSelectedPhotos({ photographerId: owner.id, photoIds: photos.slice(0, 2).map((photo) => photo.id), name: "Race Day", priceCents: 650 });
+    expect(created.eventId).toBe(library.id);
+    expect(created.slug).toBe("race-day");
+    expect(created.status).toBe("DRAFT");
+    expect(await db.photo.findMany({ where: { id: { in: photos.map((photo) => photo.id) } }, select: { id: true, albumId: true, status: true, priceOverrideCents: true } })).toEqual(expect.arrayContaining([
+      { id: photos[0].id, albumId: created.id, status: "PUBLISHED", priceOverrideCents: null },
+      { id: photos[1].id, albumId: created.id, status: "DRAFT", priceOverrideCents: 800 },
+      { id: photos[2].id, albumId: defaultAlbum.id, status: "PUBLISHED", priceOverrideCents: null },
+    ]));
+    expect(await db.photoFace.findUnique({ where: { photoId_compatibilityKey_faceIndex: { photoId: photos[0].id, compatibilityKey, faceIndex: 0 } }, select: { eventId: true, albumId: true } })).toEqual({ eventId: library.id, albumId: created.id });
+    await expect(createAlbumFromSelectedPhotos({ photographerId: owner.id, photoIds: [photos[2].id], name: "Race Day", priceCents: 650 })).resolves.toMatchObject({ slug: "race-day-2" });
+    const otherLibrary = await getOrCreateInternalLibraryEvent(other.id);
+    const otherPhoto = await db.photo.create({ data: { albumId: (await getOrCreateDefaultAlbum({ eventId: otherLibrary.id, photographerId: other.id, priceCents: 500 })).id, originalKey: "private/other", previewKey: "public/other", originalFilename: "other.jpg", mimeType: "image/jpeg", fileSize: bytes.length } });
+    await expect(createAlbumFromSelectedPhotos({ photographerId: owner.id, photoIds: [photos[0].id, otherPhoto.id], name: "Invalid", priceCents: 500 })).rejects.toThrow("private library");
+    await expect(createAlbumFromSelectedPhotos({ photographerId: owner.id, photoIds: [photos[0].id, photos[0].id], name: "Duplicate", priceCents: 500 })).rejects.toThrow("invalid");
   });
   it("runs the owner-only photo pipeline and keeps originals outside public storage", async () => {
     const directory=await fs.mkdtemp(path.join(os.tmpdir(),"sportpix-integration-")); const provider=new LocalStorageProvider(directory);

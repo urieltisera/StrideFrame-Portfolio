@@ -23,7 +23,7 @@ export default async function AlbumPage({ params }: { params: Promise<{ id: stri
 
   return (
     <PhotographerShell active="albums" accountName={person.name}>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3"><Link href={`/photographer/events/${album.eventId}`} className="sf-body-secondary hover:text-[var(--text-primary)]">← Back to {album.event.title}</Link><Link href={`/e/${album.event.slug}/${album.slug}`}><Button type="button" variant="secondary">View public album</Button></Link></div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3"><Link href="/photographer/photos" className="sf-body-secondary hover:text-[var(--text-primary)]">← Back to Photos</Link>{album.status === "PUBLISHED" && <Link href={`/e/${album.event.slug}/${album.slug}`}><Button type="button" variant="secondary">View public album</Button></Link>}</div>
       <PageHeader eyebrow="Album" title={albumDisplayTitle(album)} description={album.description || "Manage photos, pricing and public access for this album."} action={<div className="flex flex-wrap items-center gap-2"><StatusBadge status={album.status} />{album.status === "PUBLISHED" ? <form action={unpublishAlbum}><input type="hidden" name="albumId" value={album.id} /><Button type="submit" variant="secondary">Unpublish album</Button></form> : <form action={publishAlbum}><input type="hidden" name="albumId" value={album.id} /><Button type="submit">Publish album</Button></form>}</div>} />
 
       <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
