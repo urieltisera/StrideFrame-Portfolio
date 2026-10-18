@@ -7,7 +7,7 @@ import type { AppearanceTheme } from "@prisma/client";
 export function CustomerShell({ children, eventName, appearance = "BLACK" }: { children: ReactNode; eventName?: string; appearance?: AppearanceTheme }) {
   return (
     <div data-appearance={appearance.toLowerCase()} className="sf-customer-shell min-h-screen bg-[var(--background)] text-[var(--text-primary)]">
-      <header className="sticky top-0 z-10 border-b border-[var(--border)] bg-white/90 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--surface)] backdrop-blur">
         <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 md:px-10">
           <div className="flex min-w-0 items-center gap-3"><BrandLogo href="/" light={appearance !== "LIGHT"} />{eventName && <span className="hidden max-w-[18rem] truncate border-l border-[var(--border)] pl-3 text-sm text-[var(--text-secondary)] sm:inline">{eventName}</span>}</div>
           <nav aria-label="Customer navigation" className="hidden items-center gap-5 text-sm font-semibold text-[var(--text-secondary)] md:flex"><Link href="/find-photos" className="transition-colors hover:text-[var(--text-primary)]">Find Photos</Link><Link href="/for-photographers" className="transition-colors hover:text-[var(--text-primary)]">For Photographers</Link><Link href="/photographer/login" className="transition-colors hover:text-[var(--text-primary)]">Sign In</Link></nav>

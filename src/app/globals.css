@@ -13,9 +13,10 @@
   --gradient-ink: linear-gradient(135deg, #0a1524 0%, #132238 62%, #263957 100%);
   --gradient-ink-orange: linear-gradient(135deg, #0a1524 0%, #132238 66%, #8c321e 140%);
   --motion-control: 160ms ease-out; --motion-surface: 220ms ease-out; --motion-focus-pull: 200ms ease-out;
-  /* Intentionally zero-network; approved local Manrope/Inter assets can replace these stacks later. */
+  /* Intentionally zero-network: display and UI roles stay centralized here. */
   --font-display: var(--font-barlow), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-body: var(--font-ui);
 }
 * { box-sizing: border-box; }
 html { background: var(--background); overflow-x: hidden; }

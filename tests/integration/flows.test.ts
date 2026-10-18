@@ -10,6 +10,7 @@ import { createPhoto, deletePhoto } from "../../src/lib/photos";
 import { createDraftEvent } from "../../src/lib/events";
 import { getOrCreateDefaultAlbum, getOrCreateInternalLibraryEvent, internalLibraryEventSlug } from "../../src/lib/upload-workflow";
 import { createAlbumFromSelectedPhotos } from "../../src/lib/album-creation";
+import { addPhotosToDraftAlbum, createEmptyAlbumForPhotographer, removePhotoFromDraftAlbum } from "../../src/lib/album-membership";
 import { publishAlbumForPhotographer } from "../../src/lib/album-publication";
 import { LocalStorageProvider } from "../../src/lib/storage";
 import { createPendingOrder, validateCheckoutInput } from "../../src/lib/orders";
@@ -173,6 +174,34 @@ suite("PostgreSQL critical flows", () => {
     const otherPhoto = await db.photo.create({ data: { albumId: (await getOrCreateDefaultAlbum({ eventId: otherLibrary.id, photographerId: other.id, priceCents: 500 })).id, originalKey: "private/other", previewKey: "public/other", originalFilename: "other.jpg", mimeType: "image/jpeg", fileSize: bytes.length } });
     await expect(createAlbumFromSelectedPhotos({ photographerId: owner.id, photoIds: [photos[0].id, otherPhoto.id], name: "Invalid", priceCents: 500 })).rejects.toThrow("private library");
     await expect(createAlbumFromSelectedPhotos({ photographerId: owner.id, photoIds: [photos[0].id, photos[0].id], name: "Duplicate", priceCents: 500 })).rejects.toThrow("invalid");
+  });
+  it("creates empty draft albums and preserves photos while editing draft membership", async () => {
+    const [owner, other] = await Promise.all([
+      db.photographer.create({ data: { email: "membership-owner@example.com", name: "Membership Owner", passwordHash: "x" } }),
+      db.photographer.create({ data: { email: "membership-other@example.com", name: "Membership Other", passwordHash: "x" } }),
+    ]);
+    const library = await getOrCreateInternalLibraryEvent(owner.id);
+    const privateAlbum = await getOrCreateDefaultAlbum({ eventId: library.id, photographerId: owner.id, priceCents: 500 });
+    const draft = await createEmptyAlbumForPhotographer({ photographerId: owner.id, name: "Empty Draft", priceCents: 700 });
+    expect(draft.status).toBe("DRAFT");
+    expect(await db.photo.count({ where: { albumId: draft.id } })).toBe(0);
+    const photo = await db.photo.create({ data: { albumId: privateAlbum.id, originalKey: "private/membership-original", previewKey: "private/membership-preview", originalFilename: "membership.jpg", mimeType: "image/jpeg", fileSize: 10, status: "PUBLISHED" } });
+    const compatibilityKey = "membership-test";
+    await db.$executeRawUnsafe(`INSERT INTO "PhotoFace" ("id","photoId","eventId","albumId","embedding","detectionConfidence","boundingBox","faceIndex","providerId","modelId","modelVersion","embeddingFormatVersion","embeddingDimension","similarityMetric","compatibilityKey","createdAt") VALUES ($1,$2,$3,$4,array_fill(0::real, ARRAY[512])::vector,$5,$6::jsonb,$7,$8,$9,$10,$11,$12,$13,$14,NOW())`, crypto.randomUUID(), photo.id, library.id, privateAlbum.id, 0.9, JSON.stringify({ x: 1 }), 0, "test", "test", "test", "test", 512, "COSINE", compatibilityKey);
+    await addPhotosToDraftAlbum({ photographerId: owner.id, albumId: draft.id, photoIds: [photo.id] });
+    expect((await db.photo.findUnique({ where: { id: photo.id }, select: { albumId: true, originalKey: true } }))).toEqual({ albumId: draft.id, originalKey: "private/membership-original" });
+    expect(await db.photoFace.findUnique({ where: { photoId_compatibilityKey_faceIndex: { photoId: photo.id, compatibilityKey, faceIndex: 0 } }, select: { eventId: true, albumId: true } })).toEqual({ eventId: library.id, albumId: draft.id });
+    await expect(addPhotosToDraftAlbum({ photographerId: owner.id, albumId: draft.id, photoIds: [photo.id] })).rejects.toThrow("private library");
+    const otherLibrary = await getOrCreateInternalLibraryEvent(other.id);
+    const otherAlbum = await getOrCreateDefaultAlbum({ eventId: otherLibrary.id, photographerId: other.id, priceCents: 500 });
+    const otherPhoto = await db.photo.create({ data: { albumId: otherAlbum.id, originalKey: "private/other-membership", previewKey: "private/other-membership-preview", originalFilename: "other.jpg", mimeType: "image/jpeg", fileSize: 10 } });
+    await expect(addPhotosToDraftAlbum({ photographerId: owner.id, albumId: draft.id, photoIds: [otherPhoto.id] })).rejects.toThrow("owned");
+    const beforeRemoval = await db.photo.findUniqueOrThrow({ where: { id: photo.id }, select: { originalKey: true, previewKey: true } });
+    await removePhotoFromDraftAlbum({ photographerId: owner.id, albumId: draft.id, photoId: photo.id });
+    expect(await db.photo.findUnique({ where: { id: photo.id }, select: { albumId: true, originalKey: true, previewKey: true } })).toEqual({ albumId: privateAlbum.id, ...beforeRemoval });
+    expect(await db.photoFace.findUnique({ where: { photoId_compatibilityKey_faceIndex: { photoId: photo.id, compatibilityKey, faceIndex: 0 } }, select: { eventId: true, albumId: true } })).toEqual({ eventId: library.id, albumId: privateAlbum.id });
+    await addPhotosToDraftAlbum({ photographerId: owner.id, albumId: draft.id, photoIds: [photo.id] });
+    expect((await db.photo.findUnique({ where: { id: photo.id }, select: { albumId: true } }))?.albumId).toBe(draft.id);
   });
   it("runs the owner-only photo pipeline and keeps originals outside public storage", async () => {
     const directory=await fs.mkdtemp(path.join(os.tmpdir(),"sportpix-integration-")); const provider=new LocalStorageProvider(directory);
