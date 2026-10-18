@@ -14,6 +14,7 @@ export default async function PublicPhotographerProfile({ params }: { params: Pr
       name: true,
       id: true,
       publicProfileEnabled: true,
+      appearanceTheme: true,
       events: {
         where: { status: "PUBLISHED" },
         select: { title: true, slug: true, description: true, createdAt: true },
@@ -24,7 +25,7 @@ export default async function PublicPhotographerProfile({ params }: { params: Pr
   if (!photographer || !photographer.publicProfileEnabled) notFound();
   const publicEvents = photographer.events.filter((event) => !isInternalLibraryEvent(event, photographer.id));
 
-  return <CustomerShell eventName={photographer.name}>
+  return <CustomerShell eventName={photographer.name} appearance={photographer.appearanceTheme}>
     <section className="rounded-[2rem] bg-[var(--navy)] p-8 text-white md:p-12">
       <p className="sf-label text-[#b8aaff]">Photographer profile</p>
       <h1 className="mt-4 text-4xl font-black tracking-tight md:text-6xl">{photographer.name}</h1>

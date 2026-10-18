@@ -2,10 +2,11 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { BrandLogo } from "./brand";
 import { Icon } from "./icon";
+import type { AppearanceTheme } from "@prisma/client";
 
-export function CustomerShell({ children, eventName }: { children: ReactNode; eventName?: string }) {
+export function CustomerShell({ children, eventName, appearance = "BLACK" }: { children: ReactNode; eventName?: string; appearance?: AppearanceTheme }) {
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--text-primary)]">
+    <div data-appearance={appearance.toLowerCase()} className="sf-customer-shell min-h-screen bg-[var(--background)] text-[var(--text-primary)]">
       <header className="sticky top-0 z-10 border-b border-[var(--border)] bg-white/90 backdrop-blur">
         <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 md:px-10">
           <div className="flex min-w-0 items-center gap-3"><BrandLogo href="/" />{eventName && <span className="hidden max-w-[18rem] truncate border-l border-[var(--border)] pl-3 text-sm text-[var(--text-secondary)] sm:inline">{eventName}</span>}</div>

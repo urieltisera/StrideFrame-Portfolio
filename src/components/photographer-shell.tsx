@@ -2,11 +2,14 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { BrandLogo } from "./brand";
 import { Icon, type IconName } from "./icon";
+import type { AppearanceTheme } from "@prisma/client";
+import { getCurrentPhotographer } from "@/lib/auth";
 
 type PhotographerShellProps = {
   children: ReactNode;
   active?: "dashboard" | "events" | "photos" | "albums" | "orders" | "settings" | "profile" | "upload";
   accountName?: string;
+  appearance?: AppearanceTheme;
 };
 
 const navigation: Array<{ label: string; href: string; active: PhotographerShellProps["active"]; icon: IconName }> = [
@@ -19,7 +22,9 @@ const navigation: Array<{ label: string; href: string; active: PhotographerShell
   { label: "Public profile", href: "/photographer/dashboard#public-profile", active: "profile", icon: "user" },
 ];
 
-export function PhotographerShell({ children, active = "dashboard", accountName }: PhotographerShellProps) {
+export async function PhotographerShell({ children, active = "dashboard", accountName, appearance }: PhotographerShellProps) {
+  const current = appearance ? null : await getCurrentPhotographer();
+  const resolvedAppearance = appearance ?? current?.appearanceTheme ?? "BLACK";
   const navItem = (item: PhotographerShellProps["active"]) =>
     `flex items-center gap-3 rounded-[var(--radius-medium)] px-3 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
       active === item
@@ -28,13 +33,12 @@ export function PhotographerShell({ children, active = "dashboard", accountName 
     }`;
 
   return (
-    <div data-photographer-shell data-appearance="dark" suppressHydrationWarning className="sf-photographer-shell min-h-screen bg-[var(--background)] text-[var(--text-primary)]">
-      <script dangerouslySetInnerHTML={{ __html: `try{const v=localStorage.getItem("strideframe-photographer-appearance");if(v==="light"||v==="dark"||v==="black")document.currentScript?.parentElement?.setAttribute("data-appearance",v)}catch{}` }} />
+    <div data-photographer-shell data-appearance={resolvedAppearance.toLowerCase()} className="sf-photographer-shell min-h-screen bg-[var(--background)] text-[var(--text-primary)]">
       <aside className="fixed inset-y-0 left-0 z-20 hidden h-dvh max-h-dvh w-60 flex-col overflow-hidden bg-[var(--ink)] px-5 py-6 text-white lg:flex">
         <div className="shrink-0"><BrandLogo href="/photographer/dashboard" light />
         <p className="mt-2 text-xs text-white/45">Photographer workspace</p>
         <Link href="/photographer/upload" className="mt-8 flex items-center justify-center gap-2 rounded-[var(--radius-small)] bg-[var(--orange)] px-3 py-3 text-sm font-bold text-white transition-colors hover:bg-[var(--accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--orange)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ink)]"><Icon name="upload" size={18} />Upload photos</Link>
-        </div><div className="mt-8 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4 pr-1"><div className="grid gap-7">
+        </div><div className="sf-sidebar-scroll mt-8 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4 pr-1"><div className="grid gap-7">
           <nav aria-label="Photographer navigation" className="grid gap-1">
             <p className="sf-label mb-2 px-3 text-white/40">Overview</p>
             {navigation.slice(1, 2).map((item) => <Link key={item.href} className={navItem(item.active)} href={item.href}><Icon name={item.icon} size={18} />{item.label}</Link>)}

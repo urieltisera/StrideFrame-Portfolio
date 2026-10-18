@@ -12,6 +12,12 @@ enum PublishStatus {
   PUBLISHED
 }
 
+enum AppearanceTheme {
+  BLACK
+  DARK
+  LIGHT
+}
+
 enum OrderStatus {
   PENDING_PAYMENT
   AWAITING_PAYMENT_CONFIRMATION
@@ -99,6 +105,7 @@ model Photographer {
   passwordHash         String
   publicSlug           String?                      @unique
   publicProfileEnabled Boolean                      @default(false)
+  appearanceTheme     AppearanceTheme               @default(BLACK)
   createdAt            DateTime                     @default(now())
   updatedAt            DateTime                     @updatedAt
   events               Event[]

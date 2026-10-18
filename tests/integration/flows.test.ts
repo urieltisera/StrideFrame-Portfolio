@@ -32,6 +32,17 @@ suite("PostgreSQL critical flows", () => {
     await expect(db.photographer.create({data:{email:"one@example.com",name:"Duplicate",passwordHash:hash}})).rejects.toThrow();
     expect(await bcrypt.compare("wrong", photographer.passwordHash)).toBe(false);
   });
+  it("defaults appearance to BLACK and keeps photographer themes isolated", async () => {
+    const [first, second] = await Promise.all([
+      db.photographer.create({ data: { email: "theme-first@example.com", name: "Theme First", passwordHash: "x" } }),
+      db.photographer.create({ data: { email: "theme-second@example.com", name: "Theme Second", passwordHash: "x" } }),
+    ]);
+    expect(first.appearanceTheme).toBe("BLACK");
+    expect(second.appearanceTheme).toBe("BLACK");
+    await db.photographer.update({ where: { id: first.id }, data: { appearanceTheme: "LIGHT" } });
+    expect((await db.photographer.findUnique({ where: { id: first.id }, select: { appearanceTheme: true } }))?.appearanceTheme).toBe("LIGHT");
+    expect((await db.photographer.findUnique({ where: { id: second.id }, select: { appearanceTheme: true } }))?.appearanceTheme).toBe("BLACK");
+  });
   it("enforces event and album ownership and public publication filters", async () => {
     const [a,b] = await Promise.all([db.photographer.create({data:{email:"a@example.com",name:"A",passwordHash:"x"}}),db.photographer.create({data:{email:"b@example.com",name:"B",passwordHash:"x"}})]);
     const event = await db.event.create({data:{photographerId:a.id,title:"Race",slug:"race",accessCode:"racecode",status:"PUBLISHED"}});
