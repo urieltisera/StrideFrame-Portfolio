@@ -1,0 +1,155 @@
+{
+  "brand": "StrideFrame",
+  "version": "1.0",
+  "status": "HUMAN GATE - not released to engineering (COMMIT=NO PUSH=NO DEPLOY=NO)",
+  "symbol": {
+    "reference": "Option 02 / Frame Displacement",
+    "frameRatio": "3:2",
+    "slantDegrees": 12,
+    "offsetFamily": "1/2 S",
+    "authority": "Approved visual artwork (Reference A) is authoritative over nominal construction notes. Traced edge slant is ~18.4 deg and is NOT normalised to 12 deg.",
+    "cleanFrameCorrection": "Small downward notch on the bottom-right inner edge removed from both frames. Each frame is a complete quadrilateral ring (4-vertex outer, 4-vertex inner). Front inner = (228,372)(360,372)(335,450)(203,450) in Reference A px; back frame = same ring translated (-80.5,+32.5).",
+    "layering": "White back frame is occluded by the front frame silhouette (as in Reference A).",
+    "viewBox": [
+      114.63,
+      61.11
+    ],
+    "strokeUnitsS": 10
+  },
+  "wordmark": {
+    "master": "Traced Reference B section 02; section 05 tiles are descriptive only and were not used",
+    "viewBox": [
+      617.57,
+      100
+    ]
+  },
+  "colors": {
+    "frameOrange": "#FF5500",
+    "frameOrangeStatus": "FROZEN",
+    "strideWhite": "#FFFFFF",
+    "coreBlack": "#0F0F0F",
+    "surfaceDark": "#1A1A1A",
+    "contrastRatios": {
+      "orange_on_core_black": 5.98,
+      "orange_on_surface_dark": 5.43,
+      "orange_on_white": 3.21,
+      "white_on_orange": 3.21,
+      "core_black_on_orange": 5.98,
+      "white_on_core_black": 19.17
+    },
+    "usage": {
+      "orangeOnDark": "OK (>=5.4:1)",
+      "orangeOnWhite": "logo/graphics only (3.21:1)",
+      "textOnOrangeButton": "use #0F0F0F (5.98:1), not white (3.21:1)"
+    }
+  },
+  "monochrome": {
+    "status": "PENDING HUMAN CHOICE",
+    "canonicalFilesCurrentlyUse": "A exact master geometry (no gap)",
+    "optionA": "exact master geometry, no separation (vector/symbols/mono-options/*-A-exact.svg)",
+    "optionB": "optical 0.2 S separation (vector/symbols/mono-options/*-B-sep02S.svg, vector/watermark/mono-options/)"
+  },
+  "assets": {
+    "vector": [
+      "vector/logos/strideframe-logo-primary-dark.svg",
+      "vector/logos/strideframe-logo-primary-light.svg",
+      "vector/symbols/mono-options/strideframe-symbol-black-A-exact.svg",
+      "vector/symbols/mono-options/strideframe-symbol-black-B-sep02S.svg",
+      "vector/symbols/mono-options/strideframe-symbol-white-A-exact.svg",
+      "vector/symbols/mono-options/strideframe-symbol-white-B-sep02S.svg",
+      "vector/symbols/strideframe-symbol-black.svg",
+      "vector/symbols/strideframe-symbol-color.svg",
+      "vector/symbols/strideframe-symbol-safe-area.svg",
+      "vector/symbols/strideframe-symbol-white.svg",
+      "vector/watermark/mono-options/strideframe-watermark-black-B-sep02S.svg",
+      "vector/watermark/mono-options/strideframe-watermark-white-B-sep02S.svg",
+      "vector/watermark/strideframe-watermark-black.svg",
+      "vector/watermark/strideframe-watermark-white.svg",
+      "vector/wordmarks/strideframe-wordmark-black.svg",
+      "vector/wordmarks/strideframe-wordmark-dark.svg",
+      "vector/wordmarks/strideframe-wordmark-light.svg",
+      "vector/wordmarks/strideframe-wordmark-white.svg"
+    ],
+    "icons": [
+      "icons/android/android-chrome-192x192.png",
+      "icons/android/android-chrome-512x512.png",
+      "icons/apple/apple-touch-icon.png",
+      "icons/favicon/favicon-16x16.png",
+      "icons/favicon/favicon-32x32.png",
+      "icons/favicon/favicon-48x48.png",
+      "icons/favicon/favicon.ico",
+      "icons/favicon/favicon.svg",
+      "icons/pwa/maskable-icon-512x512.png",
+      "icons/pwa/maskable-icon-512x512.svg",
+      "icons/pwa/pwa-icon-192x192.png",
+      "icons/pwa/pwa-icon-512x512.png"
+    ],
+    "social": [
+      "social/og-image.png",
+      "social/social-profile.png",
+      "social/social-square.png"
+    ],
+    "lockupGeometry": {
+      "symbolHeightVsCapHeight": 1.143,
+      "gapVsCapHeight": 0.06,
+      "viewBoxPrimary": [
+        837.89,
+        114.29
+      ]
+    },
+    "notCreated": [
+      "compact lockups (none preserves the approved relationship; use symbol alone at small sizes)"
+    ]
+  },
+  "favicon": {
+    "master": "icons/favicon/favicon.svg",
+    "ico": "16,32,48",
+    "background": "#0F0F0F rounded square",
+    "symbolScaleInIcon": {
+      "16": 0.9,
+      "32": 0.82,
+      "48": 0.76,
+      "others": 0.72,
+      "maskable": "bbox diagonal 0.78 (inside 80% safe circle)"
+    },
+    "opticalVariant": "NONE - geometry unchanged; only padding reduced at 16/32/48"
+  },
+  "safeArea": {
+    "clearSpaceSymbol": "2 S",
+    "clearSpaceLogo": "0.5 x wordmark cap height",
+    "file": "vector/symbols/strideframe-symbol-safe-area.svg",
+    "minimumSizes": {
+      "symbolPx": 16,
+      "logoWidthPx": 120,
+      "wordmarkWidthPx": 96
+    }
+  },
+  "notes": {
+    "validation": {
+      "wordmark_STRIDE_iou": 0.6922260233573198,
+      "wordmark_FRAME_iou": 0.6911313246162593,
+      "letter_S_iou": 0.8936372269705603,
+      "letter_R_iou": 0.9319007263922519,
+      "letter_A_iou": 0.780860349127182,
+      "letter_F_iou": 0.8633333333333333,
+      "letter_M_iou": 0.8885678910441601,
+      "letter_E_iou": 0.9246420497362472,
+      "wordmark_self_STRIDE": 0.9867463260541135,
+      "wordmark_self_FRAME": 0.9891829376148037,
+      "contrast": {
+        "orange_on_core_black": 5.98,
+        "orange_on_surface_dark": 5.43,
+        "orange_on_white": 3.21,
+        "white_on_orange": 3.21,
+        "core_black_on_orange": 5.98,
+        "white_on_core_black": 19.17
+      },
+      "symbol_orange_iou": 0.974,
+      "symbol_white_iou": 0.918
+    },
+    "deviations": [
+      "Reference A and B draw the symbol with different proportions; A followed, lockup uses A's symbol at B's measured height/gap.",
+      "Wordmark is a raster trace as dense polylines, not hand-fitted Beziers."
+    ]
+  }
+}
