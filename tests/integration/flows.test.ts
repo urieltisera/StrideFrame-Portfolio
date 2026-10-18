@@ -12,7 +12,9 @@ import { getOrCreateDefaultAlbum, getOrCreateInternalLibraryEvent, internalLibra
 import { createAlbumFromSelectedPhotos } from "../../src/lib/album-creation";
 import { publishAlbumForPhotographer } from "../../src/lib/album-publication";
 import { LocalStorageProvider } from "../../src/lib/storage";
-import { createPendingOrder } from "../../src/lib/orders";
+import { createPendingOrder, validateCheckoutInput } from "../../src/lib/orders";
+import { getOrCreatePaymentSettings } from "../../src/lib/payment-settings";
+import { startZellePayment } from "../../src/lib/payment-service";
 import { createDownloadGrant, authorizeDownload, revokeOrderDownloads, downloadTokenHash } from "../../src/lib/downloads";
 import { GET as previewGET } from "../../src/app/api/previews/[...key]/route";
 
@@ -72,6 +74,39 @@ suite("PostgreSQL critical flows", () => {
     expect(reused.slug).toBe("event-photos");
     expect(reused.priceCents).toBe(800);
     await expect(getOrCreateDefaultAlbum({ eventId: first.id, photographerId: "not-owner", priceCents: 500 })).rejects.toThrow("not owned");
+  });
+  it("validates checkout before order creation and preserves the valid Zelle lifecycle", async () => {
+    const owner = await db.photographer.create({ data: { email: "checkout-owner@example.com", name: "Checkout Owner", passwordHash: "x" } });
+    const event = await db.event.create({ data: { photographerId: owner.id, title: "Checkout Event", slug: "checkout-event", accessCode: "checkout-code", status: "PUBLISHED" } });
+    const album = await db.album.create({ data: { photographerId: owner.id, eventId: event.id, title: "Checkout Album", slug: "checkout-album", status: "PUBLISHED", priceCents: 1500 } });
+    const photo = await db.photo.create({ data: { albumId: album.id, originalKey: "private/checkout", previewKey: "public/checkout", originalFilename: "checkout.jpg", mimeType: "image/jpeg", fileSize: 10, status: "PUBLISHED" } });
+    const settings = await getOrCreatePaymentSettings(owner.id);
+    await db.photographerPaymentSettings.update({ where: { id: settings.id }, data: { zelleEnabled: true, zelleDisplayName: "Checkout Owner", zellePaymentIdentifier: "checkout@example.com" } });
+    const initialOrders = await db.order.count();
+
+    await expect(validateCheckoutInput({ photoIds: [photo.id], email: "invalid", paymentMethod: "zelle" })).rejects.toThrow();
+    await expect(validateCheckoutInput({ photoIds: [photo.id], email: "buyer@example.com", paymentMethod: "" })).rejects.toThrow();
+    await expect(validateCheckoutInput({ photoIds: [photo.id], email: "buyer@example.com", paymentMethod: "stripe" })).rejects.toThrow("Stripe payments are not currently available");
+    expect(await db.order.count()).toBe(initialOrders);
+
+    await db.photo.update({ where: { id: photo.id }, data: { status: "DRAFT" } });
+    await expect(validateCheckoutInput({ photoIds: [photo.id], email: "buyer@example.com", paymentMethod: "zelle" })).rejects.toThrow("no longer available");
+    expect(await db.order.count()).toBe(initialOrders);
+    await db.photo.update({ where: { id: photo.id }, data: { status: "PUBLISHED" } });
+
+    const other = await db.photographer.create({ data: { email: "checkout-other@example.com", name: "Checkout Other", passwordHash: "x" } });
+    const otherEvent = await db.event.create({ data: { photographerId: other.id, title: "Other Checkout Event", slug: "other-checkout-event", accessCode: "other-checkout-code", status: "PUBLISHED" } });
+    const otherAlbum = await db.album.create({ data: { photographerId: other.id, eventId: otherEvent.id, title: "Other Checkout Album", slug: "other-checkout-album", status: "PUBLISHED" } });
+    const otherPhoto = await db.photo.create({ data: { albumId: otherAlbum.id, originalKey: "private/other-checkout", previewKey: "public/other-checkout", originalFilename: "other-checkout.jpg", mimeType: "image/jpeg", fileSize: 10, status: "PUBLISHED" } });
+    await expect(validateCheckoutInput({ photoIds: [photo.id, otherPhoto.id], email: "buyer@example.com", paymentMethod: "zelle" })).rejects.toThrow("one photographer");
+    expect(await db.order.count()).toBe(initialOrders);
+
+    const validated = await validateCheckoutInput({ photoIds: [photo.id], email: "buyer@example.com", paymentMethod: "zelle" });
+    const order = await createPendingOrder({ photoIds: validated.context.ids, email: validated.email });
+    await startZellePayment(order.publicOrderCode);
+    expect(await db.order.count()).toBe(initialOrders + 1);
+    expect((await db.order.findUnique({ where: { id: order.id } }))?.status).toBe("AWAITING_PAYMENT_CONFIRMATION");
+    expect(await db.order.count({ where: { customerEmail: "buyer@example.com" } })).toBe(1);
   });
   it("resolves one private library context per photographer without cross-owner reuse", async () => {
     const [owner, other] = await Promise.all([
