@@ -14,7 +14,7 @@
   --gradient-ink-orange: linear-gradient(135deg, #0a1524 0%, #132238 66%, #8c321e 140%);
   --motion-control: 160ms ease-out; --motion-surface: 220ms ease-out; --motion-focus-pull: 200ms ease-out;
   /* Intentionally zero-network; approved local Manrope/Inter assets can replace these stacks later. */
-  --font-display: "Arial Narrow", "Roboto Condensed", "Helvetica Neue", Arial, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 * { box-sizing: border-box; }
@@ -22,12 +22,12 @@ html { background: var(--background); overflow-x: hidden; }
 body { margin: 0; min-width: 320px; background: var(--background); color: var(--text-primary); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
 a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font-family: inherit; }
-.font-display { font-family: var(--font-display); font-stretch: condensed; }
+.font-display { font-family: var(--font-display); }
 .tabular-nums { font-variant-numeric: tabular-nums; }
-.sf-display { font-family: var(--font-display); font-stretch: condensed; font-size: clamp(2.5rem, 6vw, 5rem); line-height: .98; letter-spacing: -.055em; font-weight: 900; }
-.sf-page-title { font-family: var(--font-display); font-stretch: condensed; font-size: clamp(2rem, 4vw, 3.25rem); line-height: 1.02; letter-spacing: -.05em; font-weight: 900; }
-.sf-section-title { font-family: var(--font-display); font-stretch: condensed; font-size: 1.5rem; line-height: 1.15; letter-spacing: -.035em; font-weight: 850; }
-.sf-card-title { font-family: var(--font-display); font-stretch: condensed; font-size: 1.0625rem; line-height: 1.15; letter-spacing: -.02em; font-weight: 800; }
+.sf-display { font-family: var(--font-display); font-size: clamp(2.5rem, 6vw, 5rem); line-height: .98; letter-spacing: -.055em; font-weight: 900; }
+.sf-page-title { font-family: var(--font-display); font-size: clamp(2rem, 4vw, 3.25rem); line-height: 1.02; letter-spacing: -.05em; font-weight: 900; }
+.sf-section-title { font-family: var(--font-display); font-size: 1.5rem; line-height: 1.15; letter-spacing: -.035em; font-weight: 850; }
+.sf-card-title { font-family: var(--font-display); font-size: 1.0625rem; line-height: 1.15; letter-spacing: -.02em; font-weight: 800; }
 .sf-body { font-size: 1rem; line-height: 1.55; }
 .sf-body-secondary { color: var(--text-secondary); font-size: .9375rem; line-height: 1.5; }
 .sf-label { color: var(--text-secondary); font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
@@ -49,11 +49,11 @@ button, input, select, textarea { font-family: inherit; }
 .sf-customer-shell[data-appearance="dark"] { --background: #0a1524; --surface: #0f1d30; --surface-elevated: #132238; --surface-interactive: #1a2c43; --border: rgb(255 255 255 / .12); --text-primary: #ffffff; --text-secondary: #aeb9c6; --text-muted: #7f8d9d; --ink: #0a1524; --navy: #0a1524; --navy-soft: #132238; color-scheme: dark; }
 .sf-customer-shell[data-appearance="light"] { --background: #f7f6f2; --surface: #ffffff; --surface-elevated: #ffffff; --surface-interactive: #eeefec; --border: #dfe3e6; --text-primary: #0a1524; --text-secondary: #536171; --text-muted: #74808c; --ink: #0a1524; --navy: #0a1524; --navy-soft: #132238; color-scheme: light; }
 .sf-customer-shell:not([data-appearance="light"]) .bg-white { background: var(--surface) !important; }
-.sf-sidebar-scroll { scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / .18) transparent; }
-.sf-sidebar-scroll::-webkit-scrollbar { width: 5px; }
+.sf-sidebar-scroll { scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / .1) transparent; }
+.sf-sidebar-scroll::-webkit-scrollbar { width: 3px; }
 .sf-sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
-.sf-sidebar-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: rgb(255 255 255 / .16); }
-.sf-sidebar-scroll:hover::-webkit-scrollbar-thumb { background: rgb(255 255 255 / .28); }
+.sf-sidebar-scroll::-webkit-scrollbar-thumb { border-radius: 999px; background: rgb(255 255 255 / .1); }
+.sf-sidebar-scroll:hover::-webkit-scrollbar-thumb { background: rgb(255 255 255 / .2); }
 .sf-focus-pull { position: relative; overflow: hidden; }
 .sf-focus-pull img { transition: transform var(--motion-surface), filter var(--motion-surface); }
 .sf-focus-pull:hover img, .sf-focus-pull:focus-within img { transform: scale(1.03); }
