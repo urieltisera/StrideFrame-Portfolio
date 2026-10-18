@@ -14,7 +14,7 @@
   --gradient-ink-orange: linear-gradient(135deg, #0a1524 0%, #132238 66%, #8c321e 140%);
   --motion-control: 160ms ease-out; --motion-surface: 220ms ease-out; --motion-focus-pull: 200ms ease-out;
   /* Intentionally zero-network; approved local Manrope/Inter assets can replace these stacks later. */
-  --font-display: "Arial", "Helvetica Neue", Helvetica, sans-serif;
+  --font-display: "Arial Narrow", "Roboto Condensed", "Helvetica Neue", Arial, sans-serif;
   --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 * { box-sizing: border-box; }
@@ -22,11 +22,11 @@ html { background: var(--background); overflow-x: hidden; }
 body { margin: 0; min-width: 320px; background: var(--background); color: var(--text-primary); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
 a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font-family: inherit; }
-.font-display { font-family: var(--font-display); }
+.font-display { font-family: var(--font-display); font-stretch: condensed; }
 .tabular-nums { font-variant-numeric: tabular-nums; }
-.sf-display { font-size: clamp(2.5rem, 6vw, 5rem); line-height: .98; letter-spacing: -.05em; font-weight: 800; }
-.sf-page-title { font-size: clamp(2rem, 4vw, 3.25rem); line-height: 1.05; letter-spacing: -.04em; font-weight: 800; }
-.sf-section-title { font-size: 1.5rem; line-height: 1.2; letter-spacing: -.025em; font-weight: 750; }
+.sf-display { font-family: var(--font-display); font-stretch: condensed; font-size: clamp(2.5rem, 6vw, 5rem); line-height: .98; letter-spacing: -.055em; font-weight: 900; }
+.sf-page-title { font-family: var(--font-display); font-stretch: condensed; font-size: clamp(2rem, 4vw, 3.25rem); line-height: 1.02; letter-spacing: -.05em; font-weight: 900; }
+.sf-section-title { font-family: var(--font-display); font-stretch: condensed; font-size: 1.5rem; line-height: 1.15; letter-spacing: -.035em; font-weight: 850; }
 .sf-card-title { font-size: 1.0625rem; line-height: 1.3; font-weight: 700; }
 .sf-body { font-size: 1rem; line-height: 1.55; }
 .sf-body-secondary { color: var(--text-secondary); font-size: .9375rem; line-height: 1.5; }
@@ -38,9 +38,10 @@ button, input, select, textarea { font-family: inherit; }
 .sf-glass { background: rgb(255 255 255 / .94); backdrop-filter: blur(12px); }
 .sf-photo-placeholder { background: var(--navy-soft); }
 .sf-image-fallback { display: grid; min-height: 100%; place-items: center; background: linear-gradient(145deg, var(--navy-soft), var(--ink)); color: rgb(255 255 255 / .58); font-size: .6875rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-.sf-photographer-shell, .sf-auth-page { --background: #0a1524; --surface: #0f1d30; --surface-elevated: #132238; --surface-interactive: #1a2c43; --border: rgb(255 255 255 / .12); --border-strong: rgb(255 255 255 / .24); --text-primary: #ffffff; --text-secondary: #aeb9c6; --text-muted: #7f8d9d; --accent: #ff5a1f; --accent-hover: #ff7a4d; --accent-foreground: #ffffff; --focus: #ff8b68; --success: #5bd49b; --warning: #f2b66d; --error: #ff7b86; --info: #80b9ef; --shadow-card: 0 1px 2px rgb(0 0 0 / .18); --shadow-elevated: 0 14px 32px rgb(0 0 0 / .22); --shadow-modal: 0 24px 60px rgb(0 0 0 / .34); }
-.sf-photographer-shell { color-scheme: dark; }
-.sf-auth-page { color-scheme: dark; }
+.sf-photographer-shell { --background: #0a1524; --surface: #0f1d30; --surface-elevated: #132238; --surface-interactive: #1a2c43; --border: rgb(255 255 255 / .12); --border-strong: rgb(255 255 255 / .24); --text-primary: #ffffff; --text-secondary: #aeb9c6; --text-muted: #7f8d9d; --accent: #ff5a1f; --accent-hover: #ff7a4d; --accent-foreground: #ffffff; --focus: #ff8b68; --success: #5bd49b; --warning: #f2b66d; --error: #ff7b86; --info: #80b9ef; --shadow-card: 0 1px 2px rgb(0 0 0 / .18); --shadow-elevated: 0 14px 32px rgb(0 0 0 / .22); --shadow-modal: 0 24px 60px rgb(0 0 0 / .34); color: var(--text-primary); color-scheme: dark; }
+.sf-photographer-shell[data-appearance="light"] { --background: #f7f6f2; --surface: #ffffff; --surface-elevated: #ffffff; --surface-interactive: #eeefec; --border: #dfe3e6; --border-strong: #b9c1c7; --text-primary: #0a1524; --text-secondary: #536171; --text-muted: #74808c; --accent: #ff5a1f; --accent-hover: #d94716; --accent-foreground: #ffffff; --focus: #d94716; --success: #187a56; --warning: #a66011; --error: #b33842; --info: #2b6199; --ink: #0a1524; --navy: #0a1524; --navy-soft: #132238; --shadow-card: 0 1px 2px rgb(10 21 36 / .06); --shadow-elevated: 0 8px 24px rgb(10 21 36 / .12); color: var(--text-primary); color-scheme: light; }
+.sf-photographer-shell[data-appearance="black"] { --background: #050607; --surface: #0b0d0f; --surface-elevated: #121518; --surface-interactive: #191d20; --border: rgb(255 255 255 / .13); --border-strong: rgb(255 255 255 / .25); --text-primary: #ffffff; --text-secondary: #b4b8bc; --text-muted: #858b91; --accent: #ff5a1f; --accent-hover: #ff794d; --accent-foreground: #ffffff; --focus: #ff8b68; --success: #61d29d; --warning: #f3b86e; --error: #ff7f88; --info: #83baf0; --ink: #000000; --navy: #050607; --navy-soft: #121518; --shadow-card: 0 1px 2px rgb(0 0 0 / .3); --shadow-elevated: 0 16px 36px rgb(0 0 0 / .34); color: var(--text-primary); color-scheme: dark; }
+.sf-auth-page { --background: #0a1524; --surface: #0f1d30; --surface-elevated: #132238; --surface-interactive: #1a2c43; --border: rgb(255 255 255 / .12); --border-strong: rgb(255 255 255 / .24); --text-primary: #ffffff; --text-secondary: #aeb9c6; --text-muted: #7f8d9d; --accent: #ff5a1f; --accent-hover: #ff7a4d; --accent-foreground: #ffffff; --focus: #ff8b68; --success: #5bd49b; --warning: #f2b66d; --error: #ff7b86; --info: #80b9ef; --shadow-card: 0 1px 2px rgb(0 0 0 / .18); --shadow-elevated: 0 14px 32px rgb(0 0 0 / .22); --shadow-modal: 0 24px 60px rgb(0 0 0 / .34); color: var(--text-primary); color-scheme: dark; }
 .sf-focus-pull { position: relative; overflow: hidden; }
 .sf-focus-pull img { transition: transform var(--motion-surface), filter var(--motion-surface); }
 .sf-focus-pull:hover img, .sf-focus-pull:focus-within img { transform: scale(1.03); }
