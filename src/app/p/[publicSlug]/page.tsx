@@ -32,7 +32,7 @@ export default async function PublicPhotographerProfile({ params }: { params: Pr
     <section className="rounded-[2rem] bg-[var(--navy)] p-8 text-white md:p-12">
       {isOwner && <Link href="/photographer/photos" className="inline-flex text-sm font-bold text-white/75 hover:text-white">← Back to workspace</Link>}
       <p className="sf-label text-[#b8aaff]">Photographer profile</p>
-      <h1 className="mt-4 text-4xl font-black tracking-tight md:text-6xl">{photographer.name}</h1>
+      <h1 className="sf-page-title mt-4 text-white">{photographer.name}</h1>
       <p className="mt-4 max-w-xl text-white/70">Browse published event galleries and find the moments you want to keep.</p>
     </section>
     <section className="mt-12" aria-labelledby="published-work-heading">
