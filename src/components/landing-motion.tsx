@@ -16,7 +16,7 @@ export function LandingSportCard({ fallbackSrc }: { fallbackSrc?: string }) {
 
   return <div className="sf-sport-card relative isolate min-h-[300px] overflow-hidden rounded-[2rem] border border-white/10 bg-[var(--secondary-dark)] md:min-h-[390px]" aria-label="Sports photography preview">
     {LANDING_SPORTS.map((sport, index) => <div key={sport.id} className={`sf-sport-layer absolute inset-0 ${index === activeSport ? "is-active" : ""}`} aria-hidden="true">
-      {sport.src || fallbackSrc ? <SafeImage src={sport.src ?? fallbackSrc} alt="" className="h-full w-full object-cover" /> : <div className={`sf-sport-fallback sf-sport-fallback-${sport.id} h-full w-full`} />}
+      {sport.src || fallbackSrc ? <SafeImage src={sport.src ?? fallbackSrc} alt="" loading={index === 0 ? "eager" : "lazy"} decoding="async" style={{ objectPosition: sport.id === "motorsport" ? "58% 40%" : "50% 42%" }} className="h-full w-full object-cover" /> : <div className={`sf-sport-fallback sf-sport-fallback-${sport.id} h-full w-full`} />}
     </div>)}
     <div className="sf-sport-overlay absolute inset-0" />
     <div className="relative z-10 flex h-full min-h-[300px] flex-col justify-between p-7 md:min-h-[390px] md:p-9">

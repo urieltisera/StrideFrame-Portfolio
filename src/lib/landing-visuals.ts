@@ -11,9 +11,9 @@ export type LandingSport = {
  * changing the landing component or introducing a database dependency.
  */
 export const LANDING_SPORTS: readonly LandingSport[] = [
-  { id: "running", label: "Running", requiredPath: "/images/landing/sport-running.webp", src: null },
-  { id: "cycling", label: "Cycling", requiredPath: "/images/landing/sport-cycling.webp", src: null },
-  { id: "motorsport", label: "Motorsport", requiredPath: "/images/landing/sport-motorsport.webp", src: null },
+  { id: "running", label: "Running", requiredPath: "/images/landing/sport-running.webp", src: "/images/landing/sport-running.webp" },
+  { id: "cycling", label: "Cycling", requiredPath: "/images/landing/sport-cycling.webp", src: "/images/landing/sport-cycling.webp" },
+  { id: "motorsport", label: "Motorsport", requiredPath: "/images/landing/sport-motorsport.webp", src: "/images/landing/sport-motorsport.webp" },
 ];
 
 export const LANDING_TICKER_ITEMS = [
