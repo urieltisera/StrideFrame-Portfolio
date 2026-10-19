@@ -14,7 +14,7 @@ function errorResponse(message: string, status = 400) {
 
 function safeUploadError(error: unknown) {
   const message = error instanceof Error ? error.message : "";
-  if (/Unsupported image type|Image exceeds|Unsupported|corrupted|dimensions|pixels|photos|upload batch|Event name|Event not found|Album not found|price|unique event URL/i.test(message)) return message;
+  if (/Unsupported image type|Image exceeds|Unsupported|corrupted|dimensions|pixels|photos|upload batch|Event name|Event not found|Album not found|price|unique event URL|draft album/i.test(message)) return message;
   return "Upload could not be completed";
 }
 
@@ -48,6 +48,7 @@ export async function POST(request: Request) {
       ? await getOwnedUploadAlbum({ albumId: requestedAlbumId, eventId: event.id, photographerId: photographer.id })
       : await getOrCreateDefaultAlbum({ eventId: event.id, photographerId: photographer.id, priceCents });
     if (!album) throw new Error("Album not found for this event");
+    if (requestedAlbumId && album.status !== "DRAFT") throw new Error("Only a draft album can receive uploads");
     if (requestedAlbumId) await prisma.album.update({ where: { id: album.id }, data: { priceCents } });
 
     const errors: string[] = [];

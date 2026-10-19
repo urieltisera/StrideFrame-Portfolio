@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/badge";
 import { SafeImage } from "@/components/safe-image";
 import { Input } from "@/components/form-fields";
 import { createAlbumFromSelection } from "@/app/photographer/actions";
+import { deletePhotoAction } from "@/app/photographer/actions";
 
 export type InventoryPhoto = {
   id: string;
@@ -68,7 +69,7 @@ export function PhotoInventory({ photos }: { photos: InventoryPhoto[] }) {
           <div className="p-3">
             <div className="flex items-start justify-between gap-2"><p className="min-w-0 truncate text-sm font-bold" title={photo.originalFilename}>{photo.originalFilename}</p><StatusBadge status={photo.status} /></div>
             <p className="sf-caption mt-2 truncate">{photo.albumTitle}{photo.collectionLabel ? ` · ${photo.collectionLabel}` : ""}</p>
-            <p className="mt-3 text-sm font-extrabold">{photo.priceLabel}</p>
+            <div className="mt-3 flex items-center justify-between gap-2"><p className="text-sm font-extrabold">{photo.priceLabel}</p><form action={deletePhotoAction} onSubmit={(event) => { if (!window.confirm("Delete this photo permanently? This cannot be undone.")) event.preventDefault(); }}><input type="hidden" name="photoId" value={photo.id} /><button type="submit" className="text-xs font-bold text-[var(--error)] hover:underline">Delete Photo</button></form></div>
           </div>
         </Card>;
       })}

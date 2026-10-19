@@ -7,10 +7,13 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createPhoto, deletePhoto } from "../../src/lib/photos";
+import { deletePhotoSafely } from "../../src/lib/photos";
 import { createDraftEvent } from "../../src/lib/events";
 import { getOrCreateDefaultAlbum, getOrCreateInternalLibraryEvent, internalLibraryEventSlug } from "../../src/lib/upload-workflow";
 import { createAlbumFromSelectedPhotos } from "../../src/lib/album-creation";
 import { addPhotosToDraftAlbum, createEmptyAlbumForPhotographer, removePhotoFromDraftAlbum } from "../../src/lib/album-membership";
+import { deleteDraftAlbumSafely } from "../../src/lib/album-lifecycle";
+import { issueVerificationToken, verifyEmailToken } from "../../src/lib/email";
 import { publishAlbumForPhotographer } from "../../src/lib/album-publication";
 import { LocalStorageProvider } from "../../src/lib/storage";
 import { createPendingOrder, validateCheckoutInput } from "../../src/lib/orders";
@@ -34,6 +37,19 @@ suite("PostgreSQL critical flows", () => {
     expect(await bcrypt.compare("password-123", photographer.passwordHash)).toBe(true);
     await expect(db.photographer.create({data:{email:"one@example.com",name:"Duplicate",passwordHash:hash}})).rejects.toThrow();
     expect(await bcrypt.compare("wrong", photographer.passwordHash)).toBe(false);
+  });
+  it("requires expiring single-use email verification tokens", async () => {
+    const photographer = await db.photographer.create({ data: { email: "verify@example.com", name: "Verify", passwordHash: "x" } });
+    const issued = await issueVerificationToken(photographer.id);
+    expect(issued.sent).toBe(true);
+    expect(await issueVerificationToken(photographer.id)).toMatchObject({ sent: false, reason: "cooldown" });
+    expect(await verifyEmailToken("wrong-token")).toBe("invalid");
+    expect(await verifyEmailToken(issued.token!)).toBe("verified");
+    expect(await verifyEmailToken(issued.token!)).toBe("invalid");
+    const expired = await db.photographer.create({ data: { email: "expired@example.com", name: "Expired", passwordHash: "x" } });
+    const expiredToken = await issueVerificationToken(expired.id);
+    await db.photographer.update({ where: { id: expired.id }, data: { emailVerificationExpiresAt: new Date(Date.now() - 1000) } });
+    expect(await verifyEmailToken(expiredToken.token!)).toBe("expired");
   });
   it("defaults appearance to BLACK and keeps photographer themes isolated", async () => {
     const [first, second] = await Promise.all([
@@ -202,6 +218,25 @@ suite("PostgreSQL critical flows", () => {
     expect(await db.photoFace.findUnique({ where: { photoId_compatibilityKey_faceIndex: { photoId: photo.id, compatibilityKey, faceIndex: 0 } }, select: { eventId: true, albumId: true } })).toEqual({ eventId: library.id, albumId: privateAlbum.id });
     await addPhotosToDraftAlbum({ photographerId: owner.id, albumId: draft.id, photoIds: [photo.id] });
     expect((await db.photo.findUnique({ where: { id: photo.id }, select: { albumId: true } }))?.albumId).toBe(draft.id);
+  });
+  it("safely deletes eligible photos and draft albums without losing library photos", async () => {
+    const [owner, other] = await Promise.all([
+      db.photographer.create({ data: { email: "delete-owner@example.com", name: "Delete Owner", passwordHash: "x" } }),
+      db.photographer.create({ data: { email: "delete-other@example.com", name: "Delete Other", passwordHash: "x" } }),
+    ]);
+    const library = await getOrCreateInternalLibraryEvent(owner.id);
+    const defaultAlbum = await getOrCreateDefaultAlbum({ eventId: library.id, photographerId: owner.id, priceCents: 500 });
+    const draft = await createEmptyAlbumForPhotographer({ photographerId: owner.id, name: "Delete Draft", priceCents: 500 });
+    const photo = await db.photo.create({ data: { albumId: draft.id, originalKey: "private/delete-original", previewKey: "private/delete-preview", originalFilename: "delete.jpg", mimeType: "image/jpeg", fileSize: 10 } });
+    await addPhotosToDraftAlbum({ photographerId: owner.id, albumId: draft.id, photoIds: [photo.id] }).catch(() => undefined);
+    await expect(deleteDraftAlbumSafely(draft.id, other.id)).rejects.toThrow("not owned");
+    await deleteDraftAlbumSafely(draft.id, owner.id);
+    expect(await db.album.findUnique({ where: { id: draft.id } })).toBeNull();
+    expect((await db.photo.findUnique({ where: { id: photo.id }, select: { albumId: true } }))?.albumId).toBe(defaultAlbum.id);
+    const deleteEligible = await db.photo.create({ data: { albumId: defaultAlbum.id, originalKey: "private/delete-safe-original", previewKey: "private/delete-safe-preview", originalFilename: "safe.jpg", mimeType: "image/jpeg", fileSize: 10 } });
+    await expect(deletePhotoSafely(deleteEligible.id, other.id)).rejects.toThrow("not found or not owned");
+    await deletePhotoSafely(deleteEligible.id, owner.id);
+    expect(await db.photo.findUnique({ where: { id: deleteEligible.id } })).toBeNull();
   });
   it("runs the owner-only photo pipeline and keeps originals outside public storage", async () => {
     const directory=await fs.mkdtemp(path.join(os.tmpdir(),"sportpix-integration-")); const provider=new LocalStorageProvider(directory);

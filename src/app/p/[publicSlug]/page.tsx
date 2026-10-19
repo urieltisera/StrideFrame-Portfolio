@@ -39,7 +39,7 @@ export default async function PublicPhotographerProfile({ params }: { params: Pr
       <p className="sf-label text-[var(--accent)]">Published work</p>
       <h2 id="published-work-heading" className="sf-section-title mt-2">Event galleries</h2>
       <div className="mt-6 grid gap-5 sm:grid-cols-2">
-        {publicEvents.map((event) => <Link href={`/e/${event.slug}`} key={event.slug}>
+        {publicEvents.map((event) => <Link href={`/e/${event.slug}?fromProfile=${encodeURIComponent(publicSlug)}`} key={event.slug}>
           <Card variant="interactive" className="h-full p-6">
             <p className="sf-caption">{event.createdAt.toLocaleDateString()}</p>
             <h3 className="sf-card-title mt-2">{event.title}</h3>

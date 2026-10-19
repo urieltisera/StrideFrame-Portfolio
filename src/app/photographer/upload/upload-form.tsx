@@ -7,6 +7,7 @@ import { Button } from "@/components/button";
 import { Card } from "@/components/card";
 import { Input } from "@/components/form-fields";
 import { MAX_PHOTO_BYTES, MAX_UPLOAD_BYTES, MAX_PHOTOS_PER_UPLOAD, supportedMimeTypes } from "@/lib/photo-config";
+import { PHOTOGRAPHER_UPLOAD_ENDPOINT } from "@/lib/upload-contract";
 export function UploadWorkflow() {
   const router = useRouter();
   const [files, setFiles] = useState<File[]>([]);
@@ -34,7 +35,7 @@ export function UploadWorkflow() {
     form.delete("photos");
     files.forEach((file) => form.append("photos", file));
     try {
-      const response = await fetch("/api/photographer/upload", { method: "POST", body: form });
+      const response = await fetch(PHOTOGRAPHER_UPLOAD_ENDPOINT, { method: "POST", body: form });
       const result = await response.json() as { error?: string; eventId?: string; uploaded?: number; errors?: string[] };
       if (!response.ok) throw new Error(result.error || "Upload failed");
       if (result.errors?.length) { setMessage(`${result.uploaded || 0} uploaded. ${result.errors.join(" ")}`); return; }

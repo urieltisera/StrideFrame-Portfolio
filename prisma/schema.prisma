@@ -103,6 +103,10 @@ model Photographer {
   email                String                       @unique
   name                 String
   passwordHash         String
+  emailVerifiedAt      DateTime?
+  emailVerificationTokenHash String? @unique
+  emailVerificationExpiresAt DateTime?
+  emailVerificationSentAt DateTime?
   publicSlug           String?                      @unique
   publicProfileEnabled Boolean                      @default(false)
   appearanceTheme     AppearanceTheme               @default(BLACK)
