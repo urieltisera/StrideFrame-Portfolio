@@ -8,6 +8,7 @@ import { SafeImage } from "@/components/safe-image";
 import { Input } from "@/components/form-fields";
 import { createAlbumFromSelection } from "@/app/photographer/actions";
 import { deletePhotoAction } from "@/app/photographer/actions";
+import { MINIMUM_PAID_PHOTO_PRICE_CENTS, priceValidationMessage } from "@/lib/pricing";
 
 export type InventoryPhoto = {
   id: string;
@@ -23,9 +24,11 @@ export type InventoryPhoto = {
 export function PhotoInventory({ photos }: { photos: InventoryPhoto[] }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [createOpen, setCreateOpen] = useState(false);
+  const [albumPrice, setAlbumPrice] = useState("5.00");
   const [state, formAction, pending] = useActionState(createAlbumFromSelection, { error: "" });
   const visibleIds = useMemo(() => photos.map((photo) => photo.id), [photos]);
   const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const albumPriceError = priceValidationMessage(albumPrice);
 
   function togglePhoto(id: string) {
     setSelectedIds((current) => {
@@ -54,7 +57,7 @@ export function PhotoInventory({ photos }: { photos: InventoryPhoto[] }) {
         <Button type="button" variant="ghost" onClick={() => setSelectedIds(new Set())}>Clear selection</Button>
       </div>}
     </div>
-    {createOpen && <div className="mb-5 rounded-[var(--radius-large)] border border-[var(--border-strong)] bg-[var(--surface)] p-6 shadow-[var(--shadow-elevated)]" role="dialog" aria-modal="true" aria-labelledby="create-album-title"><div className="flex items-start justify-between gap-4"><div><p className="sf-kicker">{selectedIds.size} selected</p><h2 id="create-album-title" className="sf-section-title mt-2">Create album</h2><p className="sf-body-secondary mt-2">Give these photos a name and set their album price.</p></div><Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button></div><form action={formAction} className="mt-6 grid gap-5 sm:grid-cols-[minmax(0,1fr)_220px_auto] sm:items-end">{[...selectedIds].map((id) => <input key={id} type="hidden" name="photoIds" value={id} />)}<Input id="create-album-name" name="name" label="Album name" required minLength={2} maxLength={120} autoFocus /><Input id="create-album-price" name="priceDollars" label="Price per photo (USD)" required inputMode="decimal" pattern="^\d+(\.\d{1,2})?$" defaultValue="5.00" /><Button type="submit" loading={pending}>Create album</Button></form>{state.error && <p role="alert" className="mt-4 text-sm font-semibold text-[var(--error)]">{state.error}</p>}</div>}
+    {createOpen && <div className="mb-5 rounded-[var(--radius-large)] border border-[var(--border-strong)] bg-[var(--surface)] p-6 shadow-[var(--shadow-elevated)]" role="dialog" aria-modal="true" aria-labelledby="create-album-title"><div className="flex items-start justify-between gap-4"><div><p className="sf-kicker">{selectedIds.size} selected</p><h2 id="create-album-title" className="sf-section-title mt-2">Create album</h2><p className="sf-body-secondary mt-2">Give these photos a name and set their album price.</p></div><Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button></div><form action={formAction} onSubmit={(event) => { if (albumPriceError) event.preventDefault(); }} className="mt-6 grid gap-5 sm:grid-cols-[minmax(0,1fr)_220px_auto] sm:items-end">{[...selectedIds].map((id) => <input key={id} type="hidden" name="photoIds" value={id} />)}<Input id="create-album-name" name="name" label="Album name" required minLength={2} maxLength={120} autoFocus /><Input id="create-album-price" name="priceDollars" label="Price per photo (USD)" hint={`Minimum price: $${(MINIMUM_PAID_PHOTO_PRICE_CENTS / 100).toFixed(2)} USD`} error={albumPriceError || undefined} required inputMode="decimal" pattern="^\d+(\.\d{1,2})?$" value={albumPrice} onChange={(event) => setAlbumPrice(event.target.value)} /><Button type="submit" loading={pending} disabled={Boolean(albumPriceError)}>Create album</Button></form>{state.error && <p role="alert" className="mt-4 text-sm font-semibold text-[var(--error)]">{state.error}</p>}</div>}
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
       {photos.map((photo) => {
         const selected = selectedIds.has(photo.id);

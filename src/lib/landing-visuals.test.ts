@@ -9,7 +9,12 @@ describe("landing visual contracts", () => {
   });
 
   it("keeps the ticker local and content-first", () => {
-    expect(LANDING_TICKER_ITEMS).toContain("Every finish has a frame");
+    expect(LANDING_TICKER_ITEMS).toEqual([
+      "The race ends. The frame stays.",
+      "Find your frame.",
+      "Keep the finish.",
+      "StrideFrame.",
+    ]);
     expect(LANDING_TICKER_ITEMS.every((item) => !/^https?:\/\//.test(item))).toBe(true);
   });
 });

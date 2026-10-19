@@ -84,12 +84,11 @@ button, input, select, textarea { font-family: inherit; }
 .sf-sport-fallback-running { background: radial-gradient(circle at 72% 22%, rgb(255 85 0 / .32), transparent 18%), linear-gradient(135deg, #101214, #272c30); }
 .sf-sport-fallback-cycling { background: radial-gradient(circle at 24% 28%, rgb(255 255 255 / .18), transparent 18%), linear-gradient(135deg, #111417, #34322c); }
 .sf-sport-fallback-motorsport { background: radial-gradient(circle at 76% 72%, rgb(255 85 0 / .26), transparent 20%), linear-gradient(135deg, #111315, #252a2d); }
-.sf-reveal-group[data-motion-ready="true"][data-revealed="false"] .sf-reveal-item { opacity: 0; transform: translateY(1rem); }
-.sf-reveal-item { opacity: 1; transform: translateY(0); transition: opacity var(--motion-base), transform var(--motion-base); transition-delay: var(--sf-reveal-delay, 0ms); }
-.sf-step-mark { display: grid; width: 4.5rem; height: 3.25rem; place-items: center; border: 1px solid var(--border-strong); background: var(--surface-elevated); color: var(--accent); font-family: var(--font-display); font-size: 1.25rem; font-weight: 900; transform: skewX(-12deg); }
+.sf-step-mark { display: grid; width: 4.5rem; height: 3.25rem; place-items: center; border: 1px solid var(--border-strong); background: var(--surface-elevated); color: var(--accent); font-family: var(--font-display); font-size: 1.25rem; font-weight: 900; transform: skewX(-12deg); transition: opacity var(--motion-base), transform var(--motion-base); transition-delay: var(--sf-reveal-delay, 0ms); }
 .sf-step-mark span { transform: skewX(12deg); }
-.sf-step-mark-2 { border-color: color-mix(in srgb, var(--accent) 56%, var(--border)); }
-.sf-step-mark-3 { background: linear-gradient(135deg, var(--surface-elevated) 72%, var(--accent) 72%); }
+.sf-step-copy { opacity: 1; transform: translateY(0); transition: opacity var(--motion-base), transform var(--motion-base); transition-delay: calc(var(--sf-reveal-delay, 0ms) + 80ms); }
+.sf-reveal-group[data-motion-ready="true"][data-revealed="false"] .sf-step-mark { opacity: 0; transform: translateX(-1rem) skewX(-12deg); }
+.sf-reveal-group[data-motion-ready="true"][data-revealed="false"] .sf-step-copy { opacity: 0; transform: translateY(1rem); }
 .sf-ticker { position: relative; white-space: nowrap; }
 .sf-ticker-track { display: flex; width: max-content; animation: sf-ticker var(--ticker-duration) linear infinite; }
 .sf-ticker-group { display: flex; flex-shrink: 0; }

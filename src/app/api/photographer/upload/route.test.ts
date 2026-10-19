@@ -17,6 +17,7 @@ vi.mock("@/lib/upload-workflow", () => ({ getOrCreateInternalLibraryEvent: mocks
 vi.mock("@/lib/events", () => ({ createDraftEvent: mocks.createDraftEvent }));
 vi.mock("@/lib/money", () => ({ dollarsToCents: (value: string) => Math.round(Number(value) * 100) }));
 vi.mock("@/lib/prisma", () => ({ prisma: mocks.prisma }));
+vi.mock("@/lib/pricing", () => ({ MINIMUM_PAID_PHOTO_PRICE_CENTS: 100 }));
 
 import { POST } from "./route";
 
@@ -56,6 +57,14 @@ describe("photographer upload API contract", () => {
     const response = await POST(request({ albumId: "album-published", priceDollars: "5.00" }, [new File(["a"], "a.jpg", { type: "image/jpeg" })]));
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "Only a draft album can receive uploads" });
+    expect(mocks.createPhoto).not.toHaveBeenCalled();
+  });
+
+  it("maps a backend minimum-price rejection without creating photos", async () => {
+    mocks.validatePriceCents.mockImplementationOnce(() => { throw new Error("Photo price must be between 100 and 10000000 cents"); });
+    const response = await POST(request({ albumId: "album-a", priceDollars: "0.30" }, [new File(["a"], "a.jpg", { type: "image/jpeg" })]));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Price must be at least $1.00 per photo." });
     expect(mocks.createPhoto).not.toHaveBeenCalled();
   });
 

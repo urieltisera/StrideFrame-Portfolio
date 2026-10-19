@@ -4,6 +4,7 @@ import { createDraftEvent } from "@/lib/events";
 import { createPhoto, validatePriceCents, validateUploadBatch } from "@/lib/photos";
 import { dollarsToCents } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
+import { MINIMUM_PAID_PHOTO_PRICE_CENTS } from "@/lib/pricing";
 import { getOrCreateDefaultAlbum, getOrCreateInternalLibraryEvent, getOwnedUploadAlbum } from "@/lib/upload-workflow";
 
 export const runtime = "nodejs";
@@ -14,6 +15,8 @@ function errorResponse(message: string, status = 400) {
 
 function safeUploadError(error: unknown) {
   const message = error instanceof Error ? error.message : "";
+  if (/Photo price must be between|at least .* cents|price/i.test(message)) return `Price must be at least $${(MINIMUM_PAID_PHOTO_PRICE_CENTS / 100).toFixed(2)} per photo.`;
+  if (/valid USD amount/i.test(message)) return "Enter a valid price per photo.";
   if (/Unsupported image type|Image exceeds|Unsupported|corrupted|dimensions|pixels|photos|upload batch|Event name|Event not found|Album not found|price|unique event URL|draft album/i.test(message)) return message;
   return "Upload could not be completed";
 }

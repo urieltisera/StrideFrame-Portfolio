@@ -7,6 +7,7 @@ import { Button } from "@/components/button";
 import { Card } from "@/components/card";
 import { MAX_PHOTO_BYTES, MAX_PHOTOS_PER_UPLOAD, supportedMimeTypes, validateUploadBatch } from "@/lib/photo-config";
 import { PHOTOGRAPHER_UPLOAD_ENDPOINT, priceDollarsFromCents } from "@/lib/upload-contract";
+import { MINIMUM_PAID_PHOTO_PRICE_CENTS } from "@/lib/pricing";
 
 export function UploadForm({ albumId, albumPriceCents }: { albumId: string; albumPriceCents: number }) {
   const router = useRouter();
@@ -72,7 +73,7 @@ export function UploadForm({ albumId, albumPriceCents }: { albumId: string; albu
         <input ref={inputRef} type="file" multiple accept={supportedMimeTypes.join(",")} onChange={(event) => choose(event.target.files)} className="sr-only" />
       </label>
       {files.length > 0 && <Card className="p-4"><p className="sf-label">Selected files · {files.length}</p><ul className="mt-3 grid gap-2 text-sm">{files.map((file) => { const invalid = file.size > MAX_PHOTO_BYTES || !supportedMimeTypes.includes(file.type as never); return <li key={`${file.name}-${file.size}`} className={`flex flex-wrap justify-between gap-2 ${invalid ? "text-[var(--error)]" : "text-[var(--text-secondary)]"}`}><span className="truncate">{file.name}</span><span>{(file.size / 1024 / 1024).toFixed(1)} MB · {file.size > MAX_PHOTO_BYTES ? "Too large" : !supportedMimeTypes.includes(file.type as never) ? "Unsupported type" : "Ready"}</span></li>; })}</ul></Card>}
-      <div className="rounded-[var(--radius-medium)] border border-[var(--border)] bg-[var(--surface-elevated)] p-4"><p className="sf-label">Price per photo</p><p className="mt-2 text-2xl font-black">${(albumPriceCents / 100).toFixed(2)} USD</p><p className="sf-caption mt-1">Every uploaded photo inherits this album price unless you later set an individual override.</p></div>
+      <div className="rounded-[var(--radius-medium)] border border-[var(--border)] bg-[var(--surface-elevated)] p-4"><p className="sf-label">Price per photo</p><p className="mt-2 text-2xl font-black">${(albumPriceCents / 100).toFixed(2)} USD</p><p className="sf-caption mt-1">Minimum price: ${(MINIMUM_PAID_PHOTO_PRICE_CENTS / 100).toFixed(2)} USD. Every uploaded photo inherits this album price unless you later set an individual override.</p></div>
       <div className="flex flex-wrap items-center gap-4"><Button type="submit" loading={busy} disabled={busy || files.length === 0}>Upload photos</Button><p role="status" className={`sf-caption ${messageError ? "text-[var(--error)]" : "text-[var(--text-secondary)]"}`}>{message || "Invalid files are reported individually."}</p></div>
     </form>
   );

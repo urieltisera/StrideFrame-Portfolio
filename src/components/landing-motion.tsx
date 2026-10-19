@@ -34,33 +34,37 @@ const steps = [
 
 export function LandingHowItWorks() {
   const sectionRef = useRef<HTMLElement>(null);
-  const [revealed, setRevealed] = useState(false);
+  const groupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const element = sectionRef.current;
-    if (!element) return;
-    element.dataset.motionReady = "true";
+    const group = groupRef.current;
+    if (!element || !group) return;
+    group.dataset.motionReady = "true";
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      group.dataset.revealed = "true";
+      return;
+    }
     if (!("IntersectionObserver" in window)) {
-      element.dataset.revealed = "true";
+      group.dataset.revealed = "true";
       return;
     }
     const observer = new IntersectionObserver(([entry]) => {
       if (!entry.isIntersecting) return;
-      setRevealed(true);
+      group.dataset.revealed = "true";
       observer.disconnect();
     }, { threshold: 0.2 });
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
 
-  return <section ref={sectionRef} className="border-y border-[var(--border)] bg-[var(--surface)]" data-motion-ready="false" data-revealed={revealed}>
+  return <section ref={sectionRef} className="border-y border-[var(--border)] bg-[var(--surface)]">
     <div className="mx-auto max-w-7xl px-5 py-14 md:px-10">
       <p className="sf-kicker">How it works</p>
-      <div className="sf-reveal-group mt-6 grid gap-8 md:grid-cols-3">
+      <div ref={groupRef} className="sf-reveal-group mt-6 grid gap-8 md:grid-cols-3" data-motion-ready="false" data-revealed="false">
         {steps.map((step, index) => <div className="sf-reveal-item" style={{ "--sf-reveal-delay": `${index * 120}ms` } as CSSProperties} key={step.number}>
-          <div className={`sf-step-mark sf-step-mark-${index + 1}`} aria-hidden="true"><span>{step.number}</span></div>
-          <h2 className="mt-4 text-xl font-bold">{step.title}</h2>
-          <p className="sf-body-secondary mt-2">{step.copy}</p>
+          <div className="sf-step-mark" aria-hidden="true"><span>{step.number}</span></div>
+          <div className="sf-step-copy"><h2 className="mt-4 text-xl font-bold">{step.title}</h2><p className="sf-body-secondary mt-2">{step.copy}</p></div>
         </div>)}
       </div>
     </div>

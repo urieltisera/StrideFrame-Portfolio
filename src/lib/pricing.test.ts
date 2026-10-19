@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveEffectivePhotoPrice, validateRetailPriceCents } from "./pricing";
+import { priceValidationMessage, resolveEffectivePhotoPrice, validateRetailPriceCents } from "./pricing";
 
 describe("effective photo pricing", () => {
   const album = { priceCents: 500 };
@@ -18,5 +18,14 @@ describe("effective photo pricing", () => {
     expect(() => validateRetailPriceCents(10_000_001)).toThrow();
     expect(() => validateRetailPriceCents(500)).not.toThrow();
     expect(() => resolveEffectivePhotoPrice({ album, priceOverrideCents: null, currency: "EUR" })).toThrow("USD");
+  });
+
+  it("validates normal USD price boundaries for photographer forms", () => {
+    expect(priceValidationMessage("0.99")).toBe("Price must be at least $1.00 per photo.");
+    expect(priceValidationMessage("1.00")).toBe("");
+    expect(priceValidationMessage("1.01")).toBe("");
+    expect(priceValidationMessage("")).toContain("valid USD amount");
+    expect(priceValidationMessage("-1.00")).toContain("valid USD amount");
+    expect(priceValidationMessage("1.999")).toContain("valid USD amount");
   });
 });

@@ -17,12 +17,8 @@ export const LANDING_SPORTS: readonly LandingSport[] = [
 ];
 
 export const LANDING_TICKER_ITEMS = [
-  "Find your moment",
-  "Own the frame",
-  "Every finish has a frame",
-  "Race",
-  "Shoot",
-  "Find",
-  "Choose",
-  "Own",
+  "The race ends. The frame stays.",
+  "Find your frame.",
+  "Keep the finish.",
+  "StrideFrame.",
 ] as const;
