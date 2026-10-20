@@ -45,3 +45,35 @@ export async function verifyEmailToken(token: string) {
   await prisma.photographer.update({ where: { id: photographer.id }, data: { emailVerifiedAt: new Date(), emailVerificationTokenHash: null, emailVerificationExpiresAt: null, emailVerificationSentAt: null } });
   return "verified" as const;
 }
+
+export type TransactionalEmailMessage = {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  attachments?: never[];
+};
+
+export type TransactionalEmailResult = {
+  delivered: boolean;
+  provider: string;
+  error?: "CONFIGURATION_REQUIRED";
+};
+
+export interface TransactionalEmailTransport {
+  send(message: TransactionalEmailMessage): Promise<{ provider: string }>;
+}
+
+export function transactionalEmailConfiguration() {
+  const configured = process.env.EMAIL_DELIVERY_PROVIDER;
+  if (process.env.NODE_ENV === "production") return { available: false, provider: configured || "CONFIGURATION_REQUIRED" };
+  if (!configured || configured === "console") return { available: true, provider: "console" };
+  return { available: false, provider: configured };
+}
+
+export async function sendTransactionalEmail(message: TransactionalEmailMessage, transport?: TransactionalEmailTransport): Promise<TransactionalEmailResult> {
+  if (transport) return { delivered: true, provider: (await transport.send(message)).provider };
+  const configuration = transactionalEmailConfiguration();
+  if (!configuration.available) return { delivered: false, provider: configuration.provider, error: "CONFIGURATION_REQUIRED" };
+  return { delivered: true, provider: configuration.provider };
+}

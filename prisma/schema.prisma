@@ -83,6 +83,17 @@ enum OrderDeliveryCapabilityStatus {
   REVOKED
 }
 
+enum TransactionalEmailKind {
+  PAID_PHOTO_DELIVERY
+}
+
+enum TransactionalEmailStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
 enum FaceIndexJobStatus {
   PENDING
   PROCESSING
@@ -304,6 +315,7 @@ model Order {
   refunds             Refund[]
   disputes            PaymentDispute[]
   deliveryCapabilities OrderDeliveryCapability[]
+  transactionalEmailOutboxes TransactionalEmailOutbox[]
 
   @@index([photographerId, status])
   @@index([customerEmail])
@@ -522,4 +534,23 @@ model OrderDeliveryCapability {
   lastUsedAt DateTime?
 
   @@index([status, expiresAt])
+}
+
+model TransactionalEmailOutbox {
+  id           String                 @id @default(cuid())
+  kind         TransactionalEmailKind @default(PAID_PHOTO_DELIVERY)
+  orderId      String
+  order        Order                  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  recipient    String
+  status       TransactionalEmailStatus @default(PENDING)
+  attemptCount Int                    @default(0)
+  nextAttemptAt DateTime              @default(now())
+  lastAttemptAt DateTime?
+  sentAt       DateTime?
+  lastError    String?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  @@unique([kind, orderId])
+  @@index([status, nextAttemptAt])
 }
