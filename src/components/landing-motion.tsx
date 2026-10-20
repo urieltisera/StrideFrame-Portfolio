@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import type { ReactNode } from "react";
 import { LANDING_SPORTS } from "@/lib/landing-visuals";
 import { SafeImage } from "./safe-image";
 
@@ -14,16 +15,28 @@ export function LandingSportCard({ fallbackSrc }: { fallbackSrc?: string }) {
     return () => window.clearInterval(interval);
   }, []);
 
-  return <div className="sf-sport-card relative isolate min-h-[300px] overflow-hidden rounded-[2rem] border border-white/10 bg-[var(--secondary-dark)] md:min-h-[390px]" aria-label="Sports photography preview">
+  return <div className="sf-sport-card relative isolate aspect-[4/3] min-h-[240px] w-full overflow-hidden bg-[var(--secondary-dark)] md:aspect-[16/8] md:min-h-0" aria-label="Sports photography preview">
     {LANDING_SPORTS.map((sport, index) => <div key={sport.id} className={`sf-sport-layer absolute inset-0 ${index === activeSport ? "is-active" : ""}`} aria-hidden="true">
       {sport.src || fallbackSrc ? <SafeImage src={sport.src ?? fallbackSrc} alt="" loading={index === 0 ? "eager" : "lazy"} decoding="async" style={{ objectPosition: sport.id === "motorsport" ? "58% 40%" : "50% 42%" }} className="h-full w-full object-cover" /> : <div className={`sf-sport-fallback sf-sport-fallback-${sport.id} h-full w-full`} />}
     </div>)}
     <div className="sf-sport-overlay absolute inset-0" />
-    <div className="relative z-10 flex h-full min-h-[300px] flex-col justify-between p-7 md:min-h-[390px] md:p-9">
-      <div className="flex items-center justify-between gap-4"><p className="sf-kicker text-white/70">{LANDING_SPORTS[activeSport].label} / StrideFrame</p><span className="sf-sport-index text-xs font-bold tabular-nums text-white/60">0{activeSport + 1} / 03</span></div>
+    <div className="relative z-10 flex h-full flex-col justify-end p-6 md:p-9">
+      <div>
+        <p className="sf-kicker text-white/70">{LANDING_SPORTS[activeSport].label} / StrideFrame</p>
+      </div>
       <div><p className="sf-kicker text-[var(--orange)]">Find. Choose. Own.</p><p className="mt-3 max-w-sm text-xl font-bold leading-tight text-white/90">The right photograph turns a result into a memory.</p></div>
     </div>
   </div>;
+}
+
+export function PhotographerHero({ children }: { children: ReactNode }) {
+  return <section className="sf-photographer-hero relative isolate overflow-hidden bg-[var(--ink)] text-white">
+    <div className="sf-photographer-hero-panels absolute inset-0" aria-hidden="true">
+      {LANDING_SPORTS.map((sport, index) => <div className="sf-photographer-hero-panel" key={sport.id}><SafeImage src={sport.src ?? sport.requiredPath} alt="" loading={index === 0 ? "eager" : "lazy"} decoding="async" /></div>)}
+    </div>
+    <div className="sf-photographer-hero-overlay absolute inset-0" />
+    <div className="relative z-10 flex min-h-[inherit] items-center">{children}</div>
+  </section>;
 }
 
 type MotionStep = { number: string; title: string; copy: string };

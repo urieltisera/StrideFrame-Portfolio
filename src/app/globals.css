@@ -24,13 +24,13 @@ html { background: var(--background); overflow-x: hidden; }
 body { margin: 0; min-width: 320px; background: var(--background); color: var(--text-primary); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
 a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font-family: inherit; }
-.font-display { font-family: var(--font-display); }
-.sf-hero-frame { display: inline-block; color: var(--orange); transform: skewX(-5deg) translateX(.03em); transform-origin: left center; }
+.font-display, .sf-display, .sf-page-title, .sf-section-title, .sf-card-title { font-family: var(--font-display); font-style: italic; font-weight: 900; }
+.sf-hero-frame { display: inline-block; color: var(--orange); letter-spacing: -.03em; transform: translateX(.035em) skewX(-7deg) scaleX(.94); transform-origin: left center; }
 .tabular-nums { font-variant-numeric: tabular-nums; }
-.sf-display { font-family: var(--font-display); font-size: clamp(2.5rem, 6vw, 5rem); line-height: .98; letter-spacing: -.055em; font-weight: 900; }
-.sf-page-title { font-family: var(--font-display); font-size: clamp(2rem, 4vw, 3.25rem); line-height: 1.02; letter-spacing: -.05em; font-weight: 900; }
-.sf-section-title { font-family: var(--font-display); font-size: 1.5rem; line-height: 1.15; letter-spacing: -.035em; font-weight: 850; }
-.sf-card-title { font-family: var(--font-display); font-size: 1.0625rem; line-height: 1.15; letter-spacing: -.02em; font-weight: 800; }
+.sf-display { font-size: clamp(2.5rem, 6vw, 5rem); line-height: .98; letter-spacing: -.055em; }
+.sf-page-title { font-size: clamp(2rem, 4vw, 3.25rem); line-height: 1.02; letter-spacing: -.05em; }
+.sf-section-title { font-size: 1.5rem; line-height: 1.15; letter-spacing: -.035em; }
+.sf-card-title { font-size: 1.0625rem; line-height: 1.15; letter-spacing: -.02em; }
 .sf-body { font-size: 1rem; line-height: 1.55; }
 .sf-body-secondary { color: var(--text-secondary); font-size: .9375rem; line-height: 1.5; }
 .sf-label { color: var(--text-secondary); font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
@@ -77,7 +77,7 @@ button, input, select, textarea { font-family: inherit; }
 .sf-photographer-shell .sf-action-strip { background: linear-gradient(110deg, rgb(255 85 0 / .13), transparent 68%); }
 .sf-sport-layer { opacity: 0; transition: opacity var(--motion-slow); }
 .sf-sport-layer.is-active { opacity: 1; }
-.sf-sport-overlay { background: linear-gradient(180deg, rgb(5 6 7 / .12), rgb(5 6 7 / .86) 88%); }
+.sf-sport-overlay { background: linear-gradient(180deg, rgb(5 6 7 / .04), rgb(5 6 7 / .72) 88%); }
 .sf-sport-fallback { position: relative; overflow: hidden; background: #181b1d; }
 .sf-sport-fallback::before, .sf-sport-fallback::after { position: absolute; border: clamp(1rem, 3vw, 3rem) solid rgb(255 255 255 / .14); content: ""; transform: skewX(-12deg) rotate(-8deg); }
 .sf-sport-fallback::before { inset: 12% 18% 24% 8%; }
@@ -85,7 +85,7 @@ button, input, select, textarea { font-family: inherit; }
 .sf-sport-fallback-running { background: radial-gradient(circle at 72% 22%, rgb(255 85 0 / .32), transparent 18%), linear-gradient(135deg, #101214, #272c30); }
 .sf-sport-fallback-cycling { background: radial-gradient(circle at 24% 28%, rgb(255 255 255 / .18), transparent 18%), linear-gradient(135deg, #111417, #34322c); }
 .sf-sport-fallback-motorsport { background: radial-gradient(circle at 76% 72%, rgb(255 85 0 / .26), transparent 20%), linear-gradient(135deg, #111315, #252a2d); }
-.sf-step-mark { display: grid; width: 4.5rem; height: 3.25rem; place-items: center; border: 1px solid var(--border-strong); background: var(--surface-elevated); color: var(--accent); font-family: var(--font-display); font-size: 1.25rem; font-weight: 900; transform: skewX(-12deg); transition: opacity var(--motion-base), transform var(--motion-base); transition-delay: var(--sf-reveal-delay, 0ms); }
+.sf-step-mark { display: grid; width: 4.5rem; height: 3.25rem; place-items: center; border: 1px solid var(--border-strong); background: var(--surface-elevated); color: var(--accent); font-family: var(--font-display); font-size: 1.25rem; font-style: italic; font-weight: 900; transform: skewX(-12deg); transition: opacity var(--motion-base), transform var(--motion-base); transition-delay: var(--sf-reveal-delay, 0ms); }
 .sf-step-mark span { transform: skewX(12deg); }
 .sf-step-copy { opacity: 1; transform: translateY(0); transition: opacity var(--motion-base), transform var(--motion-base); transition-delay: calc(var(--sf-reveal-delay, 0ms) + 80ms); }
 .sf-reveal-group[data-motion-ready="true"][data-revealed="false"] .sf-step-mark { opacity: 0; transform: translateX(-1rem) skewX(-12deg); }
@@ -96,6 +96,14 @@ button, input, select, textarea { font-family: inherit; }
 .sf-ticker-item { display: inline-flex; align-items: center; gap: 1.2rem; padding: .85rem 1.2rem; font-size: .72rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .sf-ticker-dot { font-size: 1.2rem; line-height: 0; }
 @keyframes sf-ticker { to { transform: translateX(-50%); } }
+.sf-photographer-hero { min-height: clamp(34rem, 72vw, 48rem); }
+.sf-photographer-hero-panels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sf-photographer-hero-panel { min-width: 0; overflow: hidden; }
+.sf-photographer-hero-panel img { height: 100%; width: 100%; object-fit: cover; }
+.sf-photographer-hero-panel:nth-child(1) img { object-position: 50% 42%; }
+.sf-photographer-hero-panel:nth-child(2) img { object-position: 50% 42%; }
+.sf-photographer-hero-panel:nth-child(3) img { object-position: 58% 40%; }
+.sf-photographer-hero-overlay { background: linear-gradient(90deg, rgb(5 6 7 / .88), rgb(5 6 7 / .52) 55%, rgb(5 6 7 / .32)), linear-gradient(180deg, rgb(5 6 7 / .3), rgb(5 6 7 / .68)); }
 .sf-page-reveal { animation: sf-reveal 220ms ease-out both; }
 @keyframes sf-reveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .sf-focus-pull:hover img, .sf-focus-pull:focus-within img { transform: none; } }
