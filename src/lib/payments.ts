@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { prisma } from "./prisma";
 import { PRODUCT_NAME } from "./product";
+import { finalizeConfirmedPayment } from "./payment-confirmation";
 
 export type PaymentStatus = "PENDING" | "SUCCEEDED" | "FAILED" | "CANCELLED" | "REFUNDED";
 export type WebhookPaymentResult = { providerPaymentId: string; paymentId: string; status: PaymentStatus | null; ignored?: boolean; dispute?: { providerDisputeId: string; providerEventId: string; status: "OPEN" | "WON" | "LOST"; amountCents: number; currency: string; reason?: string } };
@@ -105,8 +106,8 @@ export async function markPaymentFromWebhook(input: { paymentId: string; provide
 
     const alreadyFinal = payment.status === "SUCCEEDED" || payment.status === "REFUNDED" || payment.status === "PARTIALLY_REFUNDED" || payment.status === "DISPUTED";
     if (alreadyFinal && input.status !== payment.status) return payment;
-    const updated = await tx.payment.update({ where: { id: payment.id }, data: { providerPaymentId: input.providerPaymentId, status: input.status, paidAt: input.status === "SUCCEEDED" ? payment.paidAt || new Date() : undefined }, include: { order: true } });
-    if (input.status === "SUCCEEDED" && updated.order.status !== "PAID" && updated.order.status !== "REFUNDED") await tx.order.updateMany({ where: { id: payment.orderId, status: { in: ["PENDING_PAYMENT", "PAYMENT_FAILED"] } }, data: { status: "PAID" } });
+    if (input.status === "SUCCEEDED") return (await finalizeConfirmedPayment(tx, { paymentId: payment.id, providerPaymentId: input.providerPaymentId, connectedAccountId: input.connectedAccountId })).payment;
+    const updated = await tx.payment.update({ where: { id: payment.id }, data: { providerPaymentId: input.providerPaymentId, status: input.status }, include: { order: true } });
     if (input.status === "FAILED") await tx.order.updateMany({ where: { id: payment.orderId, status: "PENDING_PAYMENT" }, data: { status: "PAYMENT_FAILED" } });
     if (input.status === "CANCELLED") await tx.order.updateMany({ where: { id: payment.orderId, status: "PENDING_PAYMENT" }, data: { status: "CANCELLED" } });
     return updated;

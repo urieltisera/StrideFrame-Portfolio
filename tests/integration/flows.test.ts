@@ -20,6 +20,7 @@ import { LocalStorageProvider } from "../../src/lib/storage";
 import { createPendingOrder, validateCheckoutInput } from "../../src/lib/orders";
 import { getOrCreatePaymentSettings } from "../../src/lib/payment-settings";
 import { startZellePayment } from "../../src/lib/payment-service";
+import { markPaymentFromWebhook } from "../../src/lib/payments";
 import { createDownloadGrant, authorizeDownload, revokeOrderDownloads, downloadTokenHash } from "../../src/lib/downloads";
 import { GET as previewGET } from "../../src/app/api/previews/[...key]/route";
 
@@ -361,5 +362,19 @@ suite("PostgreSQL critical flows", () => {
       if (previousDirectory === undefined) delete process.env.STORAGE_LOCAL_DIR; else process.env.STORAGE_LOCAL_DIR = previousDirectory;
       await fs.rm(directory, { recursive: true, force: true });
     }
+  });
+  it("finalizes Stripe confirmation with one reusable download entitlement", async () => {
+    const owner = await db.photographer.create({ data: { email: "stripe-confirm-owner@example.com", name: "Stripe Owner", passwordHash: "x" } });
+    const event = await db.event.create({ data: { photographerId: owner.id, title: "Stripe Event", slug: "stripe-event", accessCode: "stripe-code", status: "PUBLISHED" } });
+    const album = await db.album.create({ data: { photographerId: owner.id, eventId: event.id, title: "Stripe Album", slug: "stripe-album", status: "PUBLISHED", priceCents: 1250 } });
+    const photo = await db.photo.create({ data: { albumId: album.id, originalKey: "private/stripe", previewKey: "public/stripe", originalFilename: "stripe.jpg", mimeType: "image/jpeg", fileSize: 10, priceOverrideCents: 1250, currency: "USD", status: "PUBLISHED" } });
+    const order = await createPendingOrder({ photoIds: [photo.id], email: "stripe-buyer@example.com" });
+    const payment = await db.payment.create({ data: { orderId: order.id, provider: "STRIPE", providerPaymentId: "pi_stripe_confirm", amount: order.totalCents, currency: order.currency, idempotencyKey: `stripe-confirm:${order.id}` } });
+    await markPaymentFromWebhook({ paymentId: payment.id, providerPaymentId: "pi_stripe_confirm", status: "SUCCEEDED" });
+    await markPaymentFromWebhook({ paymentId: payment.id, providerPaymentId: "pi_stripe_confirm", status: "SUCCEEDED" });
+    const confirmed = await db.order.findUnique({ where: { id: order.id }, include: { payment: true, grants: true } });
+    expect(confirmed?.status).toBe("PAID");
+    expect(confirmed?.payment?.status).toBe("SUCCEEDED");
+    expect(confirmed?.grants).toHaveLength(1);
   });
 });

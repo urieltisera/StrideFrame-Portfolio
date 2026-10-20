@@ -1,7 +1,6 @@
-import crypto from "node:crypto";
 import { prisma } from "./prisma";
-import { downloadTokenHash } from "./downloads";
 import { calculatePlatformFeeCents, platformFeePerPhotoCents } from "./commission";
+import { finalizeConfirmedPayment } from "./payment-confirmation";
 
 const MAX_NOTE_LENGTH = 500;
 
@@ -46,20 +45,18 @@ async function decideManualPayment(input: { photographerId: string; orderId: str
 
     const resultingOrderStatus = input.action === "CONFIRMED" ? "PAID" : "CANCELLED";
     const resultingPaymentStatus = input.action === "CONFIRMED" ? "SUCCEEDED" : "CANCELLED";
-    const paymentTransition = await tx.payment.updateMany({ where: { id: payment.id, status: "AWAITING_PAYMENT_CONFIRMATION" }, data: { status: resultingPaymentStatus, paidAt: input.action === "CONFIRMED" ? new Date() : null } });
-    const orderTransition = await tx.order.updateMany({ where: { id: order.id, status: "AWAITING_PAYMENT_CONFIRMATION" }, data: { status: resultingOrderStatus } });
-    if (paymentTransition.count !== 1 || orderTransition.count !== 1) throw new Error("Zelle payment is no longer awaiting confirmation");
-    const updatedPayment = await tx.payment.findUniqueOrThrow({ where: { id: payment.id } });
-    const updatedOrder = await tx.order.findUniqueOrThrow({ where: { id: order.id } });
+    const finalized = input.action === "CONFIRMED" ? await finalizeConfirmedPayment(tx, { paymentId: payment.id }) : null;
+    if (input.action === "REJECTED") {
+      const paymentTransition = await tx.payment.updateMany({ where: { id: payment.id, status: "AWAITING_PAYMENT_CONFIRMATION" }, data: { status: resultingPaymentStatus, paidAt: null } });
+      const orderTransition = await tx.order.updateMany({ where: { id: order.id, status: "AWAITING_PAYMENT_CONFIRMATION" }, data: { status: resultingOrderStatus } });
+      if (paymentTransition.count !== 1 || orderTransition.count !== 1) throw new Error("Zelle payment is no longer awaiting confirmation");
+    }
+    const updatedPayment = finalized?.payment || await tx.payment.findUniqueOrThrow({ where: { id: payment.id } });
+    const updatedOrder = finalized?.order || await tx.order.findUniqueOrThrow({ where: { id: order.id } });
     const audit = await tx.manualPaymentAudit.create({ data: { orderId: order.id, paymentId: payment.id, photographerId: input.photographerId, provider: payment.provider, action: input.action, previousOrderStatus: order.status, resultingOrderStatus, previousPaymentStatus: payment.status, resultingPaymentStatus, note } });
 
     if (input.action === "CONFIRMED") {
       await tx.zelleFeeObligation.upsert({ where: { paymentId: payment.id }, create: { photographerId: input.photographerId, orderId: order.id, paymentId: payment.id, billablePhotoCount: payment.billablePhotoCount, feePerPhotoCents: payment.platformFeePerPhotoCents, amountCents: payment.platformFeeCents, currency: payment.currency, status: "OPEN" }, update: {} });
-      const token = crypto.randomBytes(32).toString("base64url");
-      const existingGrant = await tx.downloadGrant.findUnique({ where: { orderId: order.id } });
-      const expiresAt = new Date(Date.now() + Number(process.env.DOWNLOAD_GRANT_TTL_HOURS || 72) * 60 * 60 * 1000);
-      if (existingGrant) await tx.downloadGrant.update({ where: { id: existingGrant.id }, data: { tokenHash: downloadTokenHash(token), status: "ACTIVE", expiresAt, revokedAt: null, lastUsedAt: null, usageCount: 0 } });
-      else await tx.downloadGrant.create({ data: { orderId: order.id, tokenHash: downloadTokenHash(token), status: "ACTIVE", expiresAt } });
     }
     return { order: updatedOrder, payment: updatedPayment, audit, idempotent: false };
   });
