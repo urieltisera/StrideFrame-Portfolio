@@ -4,6 +4,7 @@ import { createPendingOrder } from "../../src/lib/orders";
 import { startZellePayment } from "../../src/lib/payment-service";
 import { confirmManualPayment } from "../../src/lib/manual-payments";
 import { authorizeDownload, createDownloadGrant } from "../../src/lib/downloads";
+import { issueOrderDeliveryCapability, redeemOrderDeliveryCapability } from "../../src/lib/delivery-capabilities";
 import { completeManualZelleRefund, prepareManualZelleRefund } from "../../src/lib/refunds";
 import { handleProviderDispute as applyDispute } from "../../src/lib/disputes";
 import { findReconciliationIssues } from "../../src/lib/reconciliation";
@@ -102,5 +103,49 @@ suite("refund, dispute, and reconciliation foundation", () => {
     const duplicate = await applyDispute({ paymentId: payment.id, providerDisputeId: "dp_test", providerEventId: "evt_dispute_lost", status: "LOST", amountCents: 1000, currency: "USD" });
     expect(duplicate.idempotent).toBe(true);
     expect(photographer.id).toBeTruthy();
+  });
+
+  it("restores only fresh delivery authorization after a dispute is won", async () => {
+    const { order, photos } = await createSale(1, 1000);
+    await db.payment.update({ where: { orderId: order.id }, data: { provider: "STRIPE", providerPaymentId: "pi_dispute_won_test" } });
+    const payment = await db.payment.findUniqueOrThrow({ where: { orderId: order.id } });
+    const oldGrant = await createDownloadGrant(order.id, { rotate: true });
+    const oldCapability = await issueOrderDeliveryCapability(order.id);
+
+    await applyDispute({ paymentId: payment.id, providerDisputeId: "dp_won_test", providerEventId: "evt_won_open", status: "OPEN", amountCents: 1000, currency: "USD" });
+    await expect(authorizeDownload(oldGrant!.token, photos[0].id)).rejects.toThrow();
+    await expect(redeemOrderDeliveryCapability(oldCapability.token)).rejects.toThrow();
+
+    await applyDispute({ paymentId: payment.id, providerDisputeId: "dp_won_test", providerEventId: "evt_won_close", status: "WON", amountCents: 1000, currency: "USD" });
+    expect(await db.order.findUnique({ where: { id: order.id }, select: { status: true } })).toMatchObject({ status: "PAID" });
+    expect(await db.payment.findUnique({ where: { id: payment.id }, select: { status: true } })).toMatchObject({ status: "SUCCEEDED" });
+    expect(await db.downloadGrant.findUnique({ where: { orderId: order.id }, select: { tokenHash: true, status: true } })).toMatchObject({ status: "ACTIVE" });
+    await expect(authorizeDownload(oldGrant!.token, photos[0].id)).rejects.toThrow();
+    await expect(redeemOrderDeliveryCapability(oldCapability.token)).rejects.toThrow();
+
+    const newGrant = await createDownloadGrant(order.id, { rotate: true });
+    const newCapability = await issueOrderDeliveryCapability(order.id);
+    await expect(authorizeDownload(newGrant!.token, photos[0].id)).resolves.toMatchObject({ photo: { id: photos[0].id } });
+    await expect(redeemOrderDeliveryCapability(newCapability.token)).resolves.toMatchObject({ orderId: order.id });
+    expect(await db.transactionalEmailOutbox.count({ where: { orderId: order.id, kind: "PAID_PHOTO_DELIVERY" } })).toBe(1);
+  });
+
+  it("does not bypass an individual refund when a dispute is won", async () => {
+    const { order, photos } = await createSale(2, 1000);
+    await db.payment.update({ where: { orderId: order.id }, data: { provider: "STRIPE", providerPaymentId: "pi_partial_won_test" } });
+    const payment = await db.payment.findUniqueOrThrow({ where: { orderId: order.id } });
+    const items = await db.orderItem.findMany({ where: { orderId: order.id }, orderBy: { createdAt: "asc" } });
+    await db.orderItem.update({ where: { id: items[0].id }, data: { refundedAt: new Date() } });
+    await db.payment.update({ where: { id: payment.id }, data: { status: "PARTIALLY_REFUNDED" } });
+    await db.order.update({ where: { id: order.id }, data: { status: "PARTIALLY_REFUNDED" } });
+    const grant = await createDownloadGrant(order.id, { rotate: true });
+
+    await applyDispute({ paymentId: payment.id, providerDisputeId: "dp_partial_won_test", providerEventId: "evt_partial_open", status: "OPEN", amountCents: 1000, currency: "USD" });
+    await applyDispute({ paymentId: payment.id, providerDisputeId: "dp_partial_won_test", providerEventId: "evt_partial_won", status: "WON", amountCents: 1000, currency: "USD" });
+    expect(await db.order.findUnique({ where: { id: order.id }, select: { status: true } })).toMatchObject({ status: "PARTIALLY_REFUNDED" });
+    await expect(authorizeDownload(grant!.token, photos[0].id)).rejects.toThrow();
+    const fresh = await createDownloadGrant(order.id, { rotate: true });
+    await expect(authorizeDownload(fresh!.token, photos[1].id)).resolves.toMatchObject({ photo: { id: photos[1].id } });
+    await expect(authorizeDownload(fresh!.token, photos[0].id)).rejects.toThrow();
   });
 });

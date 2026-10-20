@@ -38,6 +38,19 @@ export async function ensureDeliveryEmailOutbox(tx: Prisma.TransactionClient, or
   });
 }
 
+export async function requeueDeliveryEmailAfterDisputeWon(tx: Prisma.TransactionClient, orderId: string) {
+  const order = await tx.order.findUnique({ where: { id: orderId }, include: { payment: true, items: { where: { refundedAt: null }, select: { id: true } } } });
+  if (!order || !["PAID", "PARTIALLY_REFUNDED"].includes(order.status) || !order.payment || !["SUCCEEDED", "PARTIALLY_REFUNDED"].includes(order.payment.status) || order.items.length === 0) {
+    return null;
+  }
+
+  return tx.transactionalEmailOutbox.upsert({
+    where: { kind_orderId: { kind: "PAID_PHOTO_DELIVERY", orderId } },
+    create: { kind: "PAID_PHOTO_DELIVERY", orderId, recipient: order.customerEmail },
+    update: { status: "PENDING", attemptCount: 0, nextAttemptAt: new Date(), lastAttemptAt: null, sentAt: null, lastError: null },
+  });
+}
+
 function messageForOrder(recipient: string, deliveryUrl: string) {
   const escapedUrl = escapeHtml(deliveryUrl);
   return {
