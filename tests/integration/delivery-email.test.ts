@@ -1,9 +1,10 @@
-import { beforeAll, afterAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import crypto from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { markPaymentFromWebhook } from "../../src/lib/payments";
 import { confirmManualPayment } from "../../src/lib/manual-payments";
 import { processPendingDeliveryEmails } from "../../src/lib/delivery-email";
+import { createDownloadGrant } from "../../src/lib/downloads";
 
 const db = new PrismaClient();
 const suite = process.env.TEST_DATABASE_URL ? describe : describe.skip;
@@ -15,6 +16,11 @@ suite("transactional delivery email outbox", () => {
     await db.orderDeliveryCapability.deleteMany();
     await db.downloadGrant.deleteMany();
     await db.manualPaymentAudit.deleteMany();
+    await db.paymentDisputeEvent.deleteMany();
+    await db.paymentDispute.deleteMany();
+    await db.zelleFeeObligationReversal.deleteMany();
+    await db.refundItem.deleteMany();
+    await db.refund.deleteMany();
     await db.zelleFeeObligation.deleteMany();
     await db.orderItem.deleteMany();
     await db.payment.deleteMany();
@@ -57,7 +63,7 @@ suite("transactional delivery email outbox", () => {
     await db.transactionalEmailOutbox.create({ data: { orderId: order.id, kind: "PAID_PHOTO_DELIVERY", recipient: order.customerEmail } });
     const previousBase = process.env.PUBLIC_BASE_URL;
     process.env.PUBLIC_BASE_URL = "https://strideframe.example";
-    let message: { to: string; text: string; html: string } | undefined;
+    let message: { to: string; text: string; html: string; attachments?: unknown } | undefined;
     await processPendingDeliveryEmails({ transport: { send: async input => { message = input; return { provider: "test" }; } } });
     if (previousBase === undefined) delete process.env.PUBLIC_BASE_URL;
     else process.env.PUBLIC_BASE_URL = previousBase;
@@ -67,6 +73,7 @@ suite("transactional delivery email outbox", () => {
     expect(message?.text).toContain("/delivery/");
     expect(message?.html).toContain("View &amp; download photos");
     expect(message?.html).not.toContain("originalKey");
+    expect(message).not.toHaveProperty("attachments");
     expect(await db.orderDeliveryCapability.count({ where: { orderId: order.id } })).toBe(1);
   });
 
@@ -91,13 +98,61 @@ suite("transactional delivery email outbox", () => {
   it("increments attempts and retries a transient transport failure", async () => {
     const { order } = await createOrder({ orderStatus: "PAID", paymentStatus: "SUCCEEDED" });
     await db.transactionalEmailOutbox.create({ data: { orderId: order.id, kind: "PAID_PHOTO_DELIVERY", recipient: order.customerEmail } });
-    const base = new Date("2026-10-20T12:00:00.000Z");
-    await processPendingDeliveryEmails({ now: base, transport: { send: async () => { throw new Error("temporary provider outage"); } } });
+    const initial = await db.transactionalEmailOutbox.findUniqueOrThrow({ where: { kind_orderId: { kind: "PAID_PHOTO_DELIVERY", orderId: order.id } } });
+    const base = new Date(initial.nextAttemptAt.getTime() + 1000);
+    const previousBase = process.env.PUBLIC_BASE_URL;
+    process.env.PUBLIC_BASE_URL = "https://strideframe.example";
+    try {
+      await processPendingDeliveryEmails({ now: base, transport: { send: async () => { throw new Error("temporary provider outage"); } } });
+    } finally {
+      if (previousBase === undefined) delete process.env.PUBLIC_BASE_URL;
+      else process.env.PUBLIC_BASE_URL = previousBase;
+    }
     const first = await db.transactionalEmailOutbox.findUniqueOrThrow({ where: { kind_orderId: { kind: "PAID_PHOTO_DELIVERY", orderId: order.id } } });
     expect(first).toMatchObject({ status: "PENDING", attemptCount: 1, lastError: "temporary provider outage" });
+    expect(first.nextAttemptAt.getTime()).toBeGreaterThan(base.getTime());
     await db.transactionalEmailOutbox.update({ where: { id: first.id }, data: { nextAttemptAt: base } });
-    await processPendingDeliveryEmails({ now: new Date(base.getTime() + 1000), transport: { send: async () => ({ provider: "test" }) } });
+    process.env.PUBLIC_BASE_URL = "https://strideframe.example";
+    try {
+      await processPendingDeliveryEmails({ now: new Date(base.getTime() + 1000), transport: { send: async () => ({ provider: "test" }) } });
+    } finally {
+      if (previousBase === undefined) delete process.env.PUBLIC_BASE_URL;
+      else process.env.PUBLIC_BASE_URL = previousBase;
+    }
     expect(await db.transactionalEmailOutbox.findUnique({ where: { id: first.id } })).toMatchObject({ status: "SENT", attemptCount: 2 });
+  });
+
+  it("does not log delivery secrets or include download secrets in email payloads", async () => {
+    const { order } = await createOrder({ orderStatus: "PAID", paymentStatus: "SUCCEEDED" });
+    const grant = await createDownloadGrant(order.id);
+    const rawDownloadToken = grant!.token;
+    await db.transactionalEmailOutbox.create({ data: { orderId: order.id, kind: "PAID_PHOTO_DELIVERY", recipient: order.customerEmail } });
+    const previousBase = process.env.PUBLIC_BASE_URL;
+    process.env.PUBLIC_BASE_URL = "https://strideframe.example";
+    let message: { text: string; html: string; attachments?: unknown } | undefined;
+    const logSpies = (["debug", "info", "log", "warn", "error"] as const).map(method => vi.spyOn(console, method));
+    try {
+      await processPendingDeliveryEmails({ transport: { send: async input => { message = input; return { provider: "test" }; } } });
+      const failedOrder = await createOrder({ orderStatus: "PAID", paymentStatus: "SUCCEEDED" });
+      await db.transactionalEmailOutbox.create({ data: { orderId: failedOrder.order.id, kind: "PAID_PHOTO_DELIVERY", recipient: failedOrder.order.customerEmail } });
+      await processPendingDeliveryEmails({ transport: { send: async () => { throw new Error("secret-boundary transport failure"); } } });
+    } finally {
+      if (previousBase === undefined) delete process.env.PUBLIC_BASE_URL;
+      else process.env.PUBLIC_BASE_URL = previousBase;
+    }
+    const logs = logSpies.flatMap(spy => spy.mock.calls.flat()).join(" ");
+    logSpies.forEach(spy => spy.mockRestore());
+    expect(message?.text).toMatch(/\/delivery\/[A-Za-z0-9_-]+/);
+    expect(message).not.toHaveProperty("attachments");
+    const deliveryUrl = message?.text.match(/https?:\/\/\S+\/delivery\/\S+/)?.[0];
+    expect(message?.text).not.toContain(rawDownloadToken);
+    expect(message?.text).not.toContain("private/");
+    expect(message?.html).not.toContain("private/");
+    expect(logs).not.toContain(rawDownloadToken);
+    expect(logs).not.toContain(deliveryUrl || "delivery-url-not-captured");
+    expect(logs).not.toContain("private/");
+    expect(logs).not.toContain("AWS_SECRET_ACCESS_KEY");
+    expect(grant).toBeTruthy();
   });
 
   it("does not send for fully refunded or disputed orders", async () => {

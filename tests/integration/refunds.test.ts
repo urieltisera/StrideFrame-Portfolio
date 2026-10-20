@@ -131,11 +131,12 @@ suite("refund, dispute, and reconciliation foundation", () => {
   });
 
   it("does not bypass an individual refund when a dispute is won", async () => {
-    const { order, photos } = await createSale(2, 1000);
+    const { order } = await createSale(2, 1000);
     await db.payment.update({ where: { orderId: order.id }, data: { provider: "STRIPE", providerPaymentId: "pi_partial_won_test" } });
     const payment = await db.payment.findUniqueOrThrow({ where: { orderId: order.id } });
     const items = await db.orderItem.findMany({ where: { orderId: order.id }, orderBy: { createdAt: "asc" } });
     await db.orderItem.update({ where: { id: items[0].id }, data: { refundedAt: new Date() } });
+    const refundedStateItems = await db.orderItem.findMany({ where: { orderId: order.id }, orderBy: { createdAt: "asc" } });
     await db.payment.update({ where: { id: payment.id }, data: { status: "PARTIALLY_REFUNDED" } });
     await db.order.update({ where: { id: order.id }, data: { status: "PARTIALLY_REFUNDED" } });
     const grant = await createDownloadGrant(order.id, { rotate: true });
@@ -143,9 +144,11 @@ suite("refund, dispute, and reconciliation foundation", () => {
     await applyDispute({ paymentId: payment.id, providerDisputeId: "dp_partial_won_test", providerEventId: "evt_partial_open", status: "OPEN", amountCents: 1000, currency: "USD" });
     await applyDispute({ paymentId: payment.id, providerDisputeId: "dp_partial_won_test", providerEventId: "evt_partial_won", status: "WON", amountCents: 1000, currency: "USD" });
     expect(await db.order.findUnique({ where: { id: order.id }, select: { status: true } })).toMatchObject({ status: "PARTIALLY_REFUNDED" });
-    await expect(authorizeDownload(grant!.token, photos[0].id)).rejects.toThrow();
+    const refundedItem = refundedStateItems.find(item => item.refundedAt !== null)!;
+    const remainingItem = refundedStateItems.find(item => item.refundedAt === null)!;
+    await expect(authorizeDownload(grant!.token, refundedItem.photoId)).rejects.toThrow();
     const fresh = await createDownloadGrant(order.id, { rotate: true });
-    await expect(authorizeDownload(fresh!.token, photos[1].id)).resolves.toMatchObject({ photo: { id: photos[1].id } });
-    await expect(authorizeDownload(fresh!.token, photos[0].id)).rejects.toThrow();
+    await expect(authorizeDownload(fresh!.token, remainingItem.photoId)).resolves.toMatchObject({ photo: { id: remainingItem.photoId } });
+    await expect(authorizeDownload(fresh!.token, refundedItem.photoId)).rejects.toThrow();
   });
 });
