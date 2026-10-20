@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
-import { createWatermarkedPreview, validateImage, validatePriceCents, validateUploadBatch, MAX_PHOTO_BYTES, MAX_UPLOAD_BYTES, MAX_PHOTOS_PER_UPLOAD, MAX_IMAGE_PIXELS, MAX_IMAGE_DIMENSION, WATERMARK_TEXT } from "./photos";
+import { createWatermarkedPreview, sha256Hex, validateImage, validatePriceCents, validateUploadBatch, MAX_PHOTO_BYTES, MAX_UPLOAD_BYTES, MAX_PHOTOS_PER_UPLOAD, MAX_IMAGE_PIXELS, MAX_IMAGE_DIMENSION, WATERMARK_TEXT } from "./photos";
 import { LocalStorageProvider } from "./storage";
 
 const temporary: string[] = [];
@@ -11,6 +11,7 @@ afterEach(async () => { await Promise.all(temporary.splice(0).map(directory => f
 async function jpeg(width = 120, height = 80) { return sharp({create:{width,height,channels:3,background:{r:30,g:160,b:100}}}).jpeg().toBuffer(); }
 describe("photo pipeline", () => {
   it("uses the StrideFrame watermark", () => { expect(WATERMARK_TEXT).toBe("STRIDEFRAME"); });
+  it("hashes the exact original byte buffer", () => { const bytes = Buffer.from([0, 1, 2, 255]); expect(sha256Hex(bytes)).toBe("3d1f57c984978ef98a18378c8166c1cb8ede02c03eeb6aee7e2f121dfeee3e56"); });
   it("validates images, creates an optimized watermarked preview, and stores USD cents", async () => { const bytes=await jpeg(); const file=new File([bytes],"race.jpg",{type:"image/jpeg"}); const valid=await validateImage(file); const preview=await createWatermarkedPreview(valid.bytes); expect(preview.contentType).toBe("image/webp"); expect(preview.bytes.length).toBeGreaterThan(0); expect(validatePriceCents(1250)).toBe(1250); });
   it("rejects unsupported, oversized, and corrupted files", async () => { await expect(validateImage(new File(["bad"],"x.txt",{type:"text/plain"}))).rejects.toThrow("Unsupported"); await expect(validateImage(new File(["bad"],"x.jpg",{type:"image/jpeg"}))).rejects.toThrow("corrupted"); });
   it("enforces the pilot upload batch boundaries before decoding", () => {

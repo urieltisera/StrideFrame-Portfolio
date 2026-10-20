@@ -219,6 +219,7 @@ model Photo {
   originalKey      String
   previewKey       String
   originalFilename String
+  originalSha256   String?
   mimeType         String
   fileSize         Int
   width            Int?

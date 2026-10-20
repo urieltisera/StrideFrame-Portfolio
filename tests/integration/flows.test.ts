@@ -7,6 +7,7 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createPhoto, deletePhoto } from "../../src/lib/photos";
+import { sha256Hex } from "../../src/lib/photos";
 import { deletePhotoSafely } from "../../src/lib/photos";
 import { createDraftEvent } from "../../src/lib/events";
 import { getOrCreateDefaultAlbum, getOrCreateInternalLibraryEvent, internalLibraryEventSlug } from "../../src/lib/upload-workflow";
@@ -333,5 +334,32 @@ suite("PostgreSQL critical flows", () => {
   it("creates hashed paid-order grants and authorizes only purchased photos", async () => {
     const owner=await db.photographer.create({data:{email:"delivery-owner@example.com",name:"Owner",passwordHash:"x"}}); const event=await db.event.create({data:{photographerId:owner.id,title:"Delivery Event",slug:"delivery-event",accessCode:"delivery-code",status:"PUBLISHED"}}); const album=await db.album.create({data:{photographerId:owner.id,eventId:event.id,title:"Delivery Album",slug:"delivery-album",status:"PUBLISHED"}}); const photo=await db.photo.create({data:{albumId:album.id,originalKey:"private/delivery",previewKey:"public/delivery",originalFilename:"delivery.jpg",mimeType:"image/jpeg",fileSize:10,priceOverrideCents:1250,currency:"USD",status:"PUBLISHED"}}); const order=await createPendingOrder({photoIds:[photo.id],email:"delivery@example.com"}); await expect(createDownloadGrant(order.id)).rejects.toThrow(); await db.order.update({where:{id:order.id},data:{status:"PAID"}}); const grant=await createDownloadGrant(order.id); expect(grant?.token).toBeTruthy(); const stored=await db.downloadGrant.findFirst({where:{orderId:order.id}}); expect(stored?.tokenHash).toBe(downloadTokenHash(grant!.token));
     await expect(authorizeDownload(grant!.token,photo.id)).resolves.toMatchObject({photo:{id:photo.id}}); await revokeOrderDownloads(order.id); await expect(authorizeDownload(grant!.token,photo.id)).rejects.toThrow(); await db.order.update({where:{id:order.id},data:{status:"REFUNDED"}}); await expect(authorizeDownload(grant!.token,photo.id)).rejects.toThrow();
+  });
+  it("persists and delivers byte-identical original masters", async () => {
+    const owner = await db.photographer.create({ data: { email: "integrity-owner@example.com", name: "Integrity Owner", passwordHash: "x" } });
+    const event = await db.event.create({ data: { photographerId: owner.id, title: "Integrity Event", slug: "integrity-event", accessCode: "integrity-code", status: "PUBLISHED" } });
+    const album = await db.album.create({ data: { photographerId: owner.id, eventId: event.id, title: "Integrity Album", slug: "integrity-album", status: "PUBLISHED", priceCents: 1250 } });
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "strideframe-integrity-"));
+    const previousProvider = process.env.STORAGE_PROVIDER;
+    const previousDirectory = process.env.STORAGE_LOCAL_DIR;
+    process.env.STORAGE_PROVIDER = "local";
+    process.env.STORAGE_LOCAL_DIR = directory;
+    try {
+      const bytes = await sharp({ create: { width: 40, height: 30, channels: 3, background: { r: 20, g: 100, b: 180 } } }).png().toBuffer();
+      const photo = await createPhoto({ photographerId: owner.id, albumId: album.id, file: new File([bytes], "integrity.png", { type: "image/png" }), provider: new LocalStorageProvider(directory) });
+      expect(photo.originalSha256).toBe(sha256Hex(bytes));
+      await expect(new LocalStorageProvider(directory).getProtectedOriginal(photo.originalKey)).resolves.toEqual(bytes);
+      const order = await createPendingOrder({ photoIds: [photo.id], email: "integrity-buyer@example.com" });
+      await db.order.update({ where: { id: order.id }, data: { status: "PAID" } });
+      const grant = await createDownloadGrant(order.id);
+      const authorized = await authorizeDownload(grant!.token, photo.id);
+      const downloaded = await new LocalStorageProvider(directory).getProtectedOriginal(authorized.photo.originalKey);
+      expect(downloaded).toEqual(bytes);
+      expect(sha256Hex(downloaded)).toBe(photo.originalSha256);
+    } finally {
+      if (previousProvider === undefined) delete process.env.STORAGE_PROVIDER; else process.env.STORAGE_PROVIDER = previousProvider;
+      if (previousDirectory === undefined) delete process.env.STORAGE_LOCAL_DIR; else process.env.STORAGE_LOCAL_DIR = previousDirectory;
+      await fs.rm(directory, { recursive: true, force: true });
+    }
   });
 });
