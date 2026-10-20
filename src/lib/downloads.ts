@@ -33,6 +33,19 @@ export async function authorizeDownload(token: string, photoId: string) {
   return { grantId: grant.id, photo: item.photo };
 }
 
+export async function authorizeOrderDeliveryDownload(orderId: string, photoId: string) {
+  if (!orderId || !photoId) throw new Error("Download unavailable");
+  const grant = await prisma.downloadGrant.findUnique({ where: { orderId }, include: { order: true } });
+  if (!grant || grant.status !== "ACTIVE" || grant.expiresAt <= new Date() || (grant.order.status !== "PAID" && grant.order.status !== "PARTIALLY_REFUNDED")) {
+    if (grant?.status === "ACTIVE" && grant.expiresAt <= new Date()) await prisma.downloadGrant.update({ where: { id: grant.id }, data: { status: "EXPIRED" } });
+    throw new Error("Download unavailable");
+  }
+  const item = await prisma.orderItem.findFirst({ where: { orderId, photoId, refundedAt: null }, include: { photo: true } });
+  if (!item) throw new Error("Download unavailable");
+  await prisma.downloadGrant.update({ where: { id: grant.id }, data: { lastUsedAt: new Date(), usageCount: { increment: 1 } } });
+  return { grantId: grant.id, photo: item.photo };
+}
+
 export async function revokeOrderDownloads(orderId: string) {
   await prisma.downloadGrant.updateMany({ where: { orderId, status: "ACTIVE" }, data: { status: "REVOKED", revokedAt: new Date() } });
 }

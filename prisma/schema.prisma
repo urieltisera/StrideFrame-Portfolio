@@ -78,6 +78,11 @@ enum DownloadGrantStatus {
   REVOKED
 }
 
+enum OrderDeliveryCapabilityStatus {
+  ACTIVE
+  REVOKED
+}
+
 enum FaceIndexJobStatus {
   PENDING
   PROCESSING
@@ -298,6 +303,7 @@ model Order {
   zelleFeeObligation  ZelleFeeObligation?
   refunds             Refund[]
   disputes            PaymentDispute[]
+  deliveryCapabilities OrderDeliveryCapability[]
 
   @@index([photographerId, status])
   @@index([customerEmail])
@@ -502,4 +508,18 @@ model DownloadGrant {
   @@unique([orderId])
   @@index([orderId, status])
   @@index([expiresAt])
+}
+
+model OrderDeliveryCapability {
+  id         String                         @id @default(cuid())
+  orderId    String                         @unique
+  order      Order                          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  tokenHash  String                         @unique
+  status     OrderDeliveryCapabilityStatus  @default(ACTIVE)
+  expiresAt  DateTime
+  createdAt  DateTime                        @default(now())
+  updatedAt  DateTime                        @updatedAt
+  lastUsedAt DateTime?
+
+  @@index([status, expiresAt])
 }
