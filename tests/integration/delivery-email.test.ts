@@ -95,6 +95,38 @@ suite("transactional delivery email outbox", () => {
     expect(await db.payment.findUnique({ where: { orderId: order.id }, select: { status: true } })).toMatchObject({ status: "SUCCEEDED" });
   });
 
+  it("keeps payment state intact when Resend returns an API failure", async () => {
+    const { order } = await createOrder({ orderStatus: "PAID", paymentStatus: "SUCCEEDED" });
+    await db.transactionalEmailOutbox.create({ data: { orderId: order.id, kind: "PAID_PHOTO_DELIVERY", recipient: order.customerEmail } });
+    const env = process.env as Record<string, string | undefined>;
+    const previousNodeEnv = env.NODE_ENV;
+    const previousProvider = env.EMAIL_DELIVERY_PROVIDER;
+    const previousApiKey = env.RESEND_API_KEY;
+    const previousBase = env.PUBLIC_BASE_URL;
+    env.NODE_ENV = "production";
+    env.EMAIL_DELIVERY_PROVIDER = "resend";
+    env.RESEND_API_KEY = "test-resend-key";
+    env.PUBLIC_BASE_URL = "https://strideframe.example";
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("provider failure", { status: 503 }));
+    try {
+      await processPendingDeliveryEmails();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      fetchSpy.mockRestore();
+      if (previousNodeEnv === undefined) delete env.NODE_ENV;
+      else env.NODE_ENV = previousNodeEnv;
+      if (previousProvider === undefined) delete env.EMAIL_DELIVERY_PROVIDER;
+      else env.EMAIL_DELIVERY_PROVIDER = previousProvider;
+      if (previousApiKey === undefined) delete env.RESEND_API_KEY;
+      else env.RESEND_API_KEY = previousApiKey;
+      if (previousBase === undefined) delete env.PUBLIC_BASE_URL;
+      else env.PUBLIC_BASE_URL = previousBase;
+    }
+    expect(await db.transactionalEmailOutbox.findUnique({ where: { kind_orderId: { kind: "PAID_PHOTO_DELIVERY", orderId: order.id } } })).toMatchObject({ status: "PENDING", attemptCount: 1, lastError: "Resend request failed with status 503" });
+    expect(await db.order.findUnique({ where: { id: order.id }, select: { status: true } })).toMatchObject({ status: "PAID" });
+    expect(await db.payment.findUnique({ where: { orderId: order.id }, select: { status: true } })).toMatchObject({ status: "SUCCEEDED" });
+  });
+
   it("increments attempts and retries a transient transport failure", async () => {
     const { order } = await createOrder({ orderStatus: "PAID", paymentStatus: "SUCCEEDED" });
     await db.transactionalEmailOutbox.create({ data: { orderId: order.id, kind: "PAID_PHOTO_DELIVERY", recipient: order.customerEmail } });

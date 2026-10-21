@@ -64,8 +64,41 @@ export interface TransactionalEmailTransport {
   send(message: TransactionalEmailMessage): Promise<{ provider: string }>;
 }
 
+export const RESEND_FROM_ADDRESS = "StrideFrame <delivery@mail.strideframe.app>";
+const RESEND_ENDPOINT = "https://api.resend.com/emails";
+
+export class ResendTransactionalEmailTransport implements TransactionalEmailTransport {
+  constructor(
+    private readonly apiKey = process.env.RESEND_API_KEY,
+    private readonly fetchImpl: typeof fetch = globalThis.fetch,
+  ) {}
+
+  async send(message: TransactionalEmailMessage) {
+    if (!this.apiKey) throw new Error("CONFIGURATION_REQUIRED");
+
+    const response = await this.fetchImpl(RESEND_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: RESEND_FROM_ADDRESS,
+        to: [message.to],
+        subject: message.subject,
+        text: message.text,
+        html: message.html,
+      }),
+    });
+
+    if (!response.ok) throw new Error(`Resend request failed with status ${response.status}`);
+    return { provider: "resend" };
+  }
+}
+
 export function transactionalEmailConfiguration() {
   const configured = process.env.EMAIL_DELIVERY_PROVIDER;
+  if (configured === "resend") return { available: Boolean(process.env.RESEND_API_KEY), provider: "resend" };
   if (process.env.NODE_ENV === "production") return { available: false, provider: configured || "CONFIGURATION_REQUIRED" };
   if (!configured || configured === "console") return { available: true, provider: "console" };
   return { available: false, provider: configured };
@@ -75,5 +108,6 @@ export async function sendTransactionalEmail(message: TransactionalEmailMessage,
   if (transport) return { delivered: true, provider: (await transport.send(message)).provider };
   const configuration = transactionalEmailConfiguration();
   if (!configuration.available) return { delivered: false, provider: configuration.provider, error: "CONFIGURATION_REQUIRED" };
+  if (configuration.provider === "resend") return { delivered: true, provider: (await new ResendTransactionalEmailTransport().send(message)).provider };
   return { delivered: true, provider: configuration.provider };
 }
