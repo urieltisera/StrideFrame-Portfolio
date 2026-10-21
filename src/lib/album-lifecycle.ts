@@ -3,10 +3,10 @@ import { prisma } from "./prisma";
 import { DEFAULT_ALBUM_SLUG, DEFAULT_ALBUM_TITLE, internalLibraryEventSlug } from "./upload-workflow";
 
 export async function deleteDraftAlbumSafely(albumId: string, photographerId: string) {
-  const album = await prisma.album.findFirst({ where: { id: albumId, photographerId }, select: { id: true, eventId: true, status: true, priceCents: true, event: { select: { slug: true } }, photos: { select: { id: true, orderItems: { select: { id: true }, take: 1 } } } } });
+  const album = await prisma.album.findFirst({ where: { id: albumId, photographerId }, select: { id: true, eventId: true, status: true, priceCents: true, event: { select: { slug: true, photographerId: true } }, photos: { select: { id: true, orderItems: { select: { id: true }, take: 1 } } } } });
   if (!album) throw new Error("Album not found or not owned");
+  if (album.event.photographerId !== photographerId) throw new Error("Album event is not owned by this photographer");
   if (album.status !== "DRAFT") throw new Error("Published albums cannot be deleted");
-  if (album.event.slug !== internalLibraryEventSlug(photographerId)) throw new Error("This legacy album cannot be safely deleted yet");
   if (album.id === (await prisma.album.findFirst({ where: { eventId: album.eventId, slug: DEFAULT_ALBUM_SLUG }, select: { id: true } }))?.id) throw new Error("The private library cannot be deleted");
   if (album.photos.some((photo) => photo.orderItems.length)) throw new Error("This album contains order history and cannot be deleted");
 

@@ -36,17 +36,24 @@ export async function POST(request: Request) {
   try {
     validateUploadBatch(files);
     const priceCents = validatePriceCents(dollarsToCents(String(form.get("priceDollars") || "")));
+    const requestedAlbumId = String(form.get("albumId") || "");
     const requestedEventId = String(form.get("eventId") || "");
-    const event = requestedEventId === "__new__"
-      ? await createDraftEvent({ photographerId: photographer.id, title: form.get("eventTitle"), description: form.get("eventDescription") })
-      : requestedEventId
-        ? await prisma.event.findFirst({ where: { id: requestedEventId, photographerId: photographer.id } }).then((existing) => {
+    const event = requestedAlbumId
+      ? await prisma.album.findFirst({ where: { id: requestedAlbumId, photographerId: photographer.id }, select: { eventId: true } }).then(async (ownedAlbum) => {
+          if (!ownedAlbum) throw new Error("Album not found for this event");
+          if (requestedEventId && requestedEventId !== ownedAlbum.eventId) throw new Error("Album does not belong to this event");
+          const existing = await prisma.event.findFirst({ where: { id: ownedAlbum.eventId, photographerId: photographer.id } });
           if (!existing) throw new Error("Event not found or not owned");
           return existing;
         })
-        : await getOrCreateInternalLibraryEvent(photographer.id);
-
-    const requestedAlbumId = String(form.get("albumId") || "");
+      : requestedEventId === "__new__"
+        ? await createDraftEvent({ photographerId: photographer.id, title: form.get("eventTitle"), description: form.get("eventDescription") })
+        : requestedEventId
+          ? await prisma.event.findFirst({ where: { id: requestedEventId, photographerId: photographer.id } }).then((existing) => {
+            if (!existing) throw new Error("Event not found or not owned");
+            return existing;
+          })
+          : await getOrCreateInternalLibraryEvent(photographer.id);
     const album = requestedAlbumId
       ? await getOwnedUploadAlbum({ albumId: requestedAlbumId, eventId: event.id, photographerId: photographer.id })
       : await getOrCreateDefaultAlbum({ eventId: event.id, photographerId: photographer.id, priceCents });

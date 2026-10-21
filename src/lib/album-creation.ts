@@ -43,10 +43,19 @@ export async function createAlbumFromSelectedPhotos(input: CreateAlbumInput) {
         });
         if (photos.length !== photoIds.length || photos.some((photo) => photo.album.eventId !== library.id)) throw new Error("Selected photos are not available in your private library");
 
-        const album = await tx.album.create({ data: { photographerId: input.photographerId, eventId: library.id, title: name, slug, description: null, priceCents, status: "DRAFT" } });
+        const event = await tx.event.create({
+          data: {
+            photographerId: input.photographerId,
+            title: name,
+            slug,
+            accessCode: crypto.randomUUID().slice(0, 8),
+            status: "DRAFT",
+          },
+        });
+        const album = await tx.album.create({ data: { photographerId: input.photographerId, eventId: event.id, title: name, slug, description: null, priceCents, status: "DRAFT" } });
         const moved = await tx.photo.updateMany({ where: { id: { in: photoIds }, album: { photographerId: input.photographerId, eventId: library.id } }, data: { albumId: album.id } });
         if (moved.count !== photoIds.length) throw new Error("Selected photos could not be moved into the album");
-        await tx.photoFace.updateMany({ where: { photoId: { in: photoIds }, eventId: library.id }, data: { albumId: album.id } });
+        await tx.photoFace.updateMany({ where: { photoId: { in: photoIds }, eventId: library.id }, data: { eventId: event.id, albumId: album.id } });
         return { ...album, photoCount: moved.count };
       });
     } catch (error) {

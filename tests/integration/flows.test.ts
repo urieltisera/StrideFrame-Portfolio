@@ -10,7 +10,7 @@ import { createPhoto, deletePhoto } from "../../src/lib/photos";
 import { sha256Hex } from "../../src/lib/photos";
 import { deletePhotoSafely } from "../../src/lib/photos";
 import { createDraftEvent } from "../../src/lib/events";
-import { getOrCreateDefaultAlbum, getOrCreateInternalLibraryEvent, internalLibraryEventSlug } from "../../src/lib/upload-workflow";
+import { getOrCreateDefaultAlbum, getOrCreateInternalLibraryEvent, internalLibraryEventSlug, isInternalLibraryEvent } from "../../src/lib/upload-workflow";
 import { createAlbumFromSelectedPhotos } from "../../src/lib/album-creation";
 import { addPhotosToDraftAlbum, createEmptyAlbumForPhotographer, removePhotoFromDraftAlbum } from "../../src/lib/album-membership";
 import { deleteDraftAlbumSafely } from "../../src/lib/album-lifecycle";
@@ -178,15 +178,23 @@ suite("PostgreSQL critical flows", () => {
     const compatibilityKey = "album-create-test";
     await db.$executeRawUnsafe(`INSERT INTO "PhotoFace" ("id","photoId","eventId","albumId","embedding","detectionConfidence","boundingBox","faceIndex","providerId","modelId","modelVersion","embeddingFormatVersion","embeddingDimension","similarityMetric","compatibilityKey","createdAt") VALUES ($1,$2,$3,$4,array_fill(0::real, ARRAY[512])::vector,$5,$6::jsonb,$7,$8,$9,$10,$11,$12,$13,$14,NOW())`, crypto.randomUUID(), photos[0].id, library.id, defaultAlbum.id, 0.9, JSON.stringify({ x: 1 }), 0, "test", "test", "test", "test", 512, "COSINE", compatibilityKey);
     const created = await createAlbumFromSelectedPhotos({ photographerId: owner.id, photoIds: photos.slice(0, 2).map((photo) => photo.id), name: "Race Day", priceCents: 650 });
-    expect(created.eventId).toBe(library.id);
+    expect(created.eventId).not.toBe(library.id);
     expect(created.slug).toBe("race-day");
     expect(created.status).toBe("DRAFT");
+    const createdEvent = await db.event.findUniqueOrThrow({ where: { id: created.eventId }, select: { status: true, slug: true, photographerId: true } });
+    expect(createdEvent).toEqual({ status: "DRAFT", slug: "race-day", photographerId: owner.id });
+    expect(isInternalLibraryEvent(createdEvent, owner.id)).toBe(false);
+    expect(await db.album.findMany({ where: { photographerId: owner.id, slug: { not: "individual-photos" }, event: { slug: { not: internalLibraryEventSlug(owner.id) } } }, select: { id: true } })).toEqual(expect.arrayContaining([{ id: created.id }]));
     expect(await db.photo.findMany({ where: { id: { in: photos.map((photo) => photo.id) } }, select: { id: true, albumId: true, status: true, priceOverrideCents: true } })).toEqual(expect.arrayContaining([
       { id: photos[0].id, albumId: created.id, status: "PUBLISHED", priceOverrideCents: null },
       { id: photos[1].id, albumId: created.id, status: "DRAFT", priceOverrideCents: 800 },
       { id: photos[2].id, albumId: defaultAlbum.id, status: "PUBLISHED", priceOverrideCents: null },
     ]));
-    expect(await db.photoFace.findUnique({ where: { photoId_compatibilityKey_faceIndex: { photoId: photos[0].id, compatibilityKey, faceIndex: 0 } }, select: { eventId: true, albumId: true } })).toEqual({ eventId: library.id, albumId: created.id });
+    expect(await db.photoFace.findUnique({ where: { photoId_compatibilityKey_faceIndex: { photoId: photos[0].id, compatibilityKey, faceIndex: 0 } }, select: { eventId: true, albumId: true } })).toEqual({ eventId: created.eventId, albumId: created.id });
+    const settings = await getOrCreatePaymentSettings(owner.id);
+    await db.photographerPaymentSettings.update({ where: { id: settings.id }, data: { zelleEnabled: true, zelleDisplayName: "Album Owner", zellePaymentIdentifier: "album-owner@example.com" } });
+    await publishAlbumForPhotographer(created.id, owner.id);
+    await expect(validateCheckoutInput({ photoIds: [photos[0].id], email: "album-buyer@example.com", paymentMethod: "zelle" })).resolves.toMatchObject({ context: { ids: [photos[0].id] } });
     await expect(createAlbumFromSelectedPhotos({ photographerId: owner.id, photoIds: [photos[2].id], name: "Race Day", priceCents: 650 })).resolves.toMatchObject({ slug: "race-day-2" });
     const otherLibrary = await getOrCreateInternalLibraryEvent(other.id);
     const otherPhoto = await db.photo.create({ data: { albumId: (await getOrCreateDefaultAlbum({ eventId: otherLibrary.id, photographerId: other.id, priceCents: 500 })).id, originalKey: "private/other", previewKey: "public/other", originalFilename: "other.jpg", mimeType: "image/jpeg", fileSize: bytes.length } });
@@ -239,6 +247,23 @@ suite("PostgreSQL critical flows", () => {
     await expect(deletePhotoSafely(deleteEligible.id, other.id)).rejects.toThrow("not found or not owned");
     await deletePhotoSafely(deleteEligible.id, owner.id);
     expect(await db.photo.findUnique({ where: { id: deleteEligible.id } })).toBeNull();
+  });
+  it("deletes owned legacy drafts safely but protects album purchase history", async () => {
+    const owner = await db.photographer.create({ data: { email: "legacy-delete-owner@example.com", name: "Legacy Delete Owner", passwordHash: "x" } });
+    const library = await getOrCreateInternalLibraryEvent(owner.id);
+    const libraryAlbum = await getOrCreateDefaultAlbum({ eventId: library.id, photographerId: owner.id, priceCents: 500 });
+    const legacyEvent = await db.event.create({ data: { photographerId: owner.id, title: "Legacy Event", slug: "legacy-delete-event", accessCode: "legacy-delete-code", status: "DRAFT" } });
+    const legacyAlbum = await db.album.create({ data: { photographerId: owner.id, eventId: legacyEvent.id, title: "Legacy Album", slug: "legacy-album", priceCents: 500, status: "DRAFT" } });
+    const legacyPhoto = await db.photo.create({ data: { albumId: legacyAlbum.id, originalKey: "private/legacy-delete", previewKey: "private/legacy-delete-preview", originalFilename: "legacy.jpg", mimeType: "image/jpeg", fileSize: 10, status: "PUBLISHED" } });
+    await deleteDraftAlbumSafely(legacyAlbum.id, owner.id);
+    expect(await db.album.findUnique({ where: { id: legacyAlbum.id } })).toBeNull();
+    expect((await db.photo.findUnique({ where: { id: legacyPhoto.id }, select: { albumId: true } }))?.albumId).toBe(libraryAlbum.id);
+
+    const protectedAlbum = await db.album.create({ data: { photographerId: owner.id, eventId: legacyEvent.id, title: "Protected Album", slug: "protected-album", priceCents: 500, status: "DRAFT" } });
+    const protectedPhoto = await db.photo.create({ data: { albumId: protectedAlbum.id, originalKey: "private/protected-delete", previewKey: "private/protected-delete-preview", originalFilename: "protected.jpg", mimeType: "image/jpeg", fileSize: 10, status: "PUBLISHED" } });
+    const order = await db.order.create({ data: { publicOrderCode: "LEGACY-DELETE-ORDER", eventId: legacyEvent.id, photographerId: owner.id, customerEmail: "legacy-buyer@example.com", subtotalCents: 500, totalCents: 500, status: "PAID", items: { create: { photoId: protectedPhoto.id, unitPriceCents: 500, originalFilename: protectedPhoto.originalFilename } } } });
+    await expect(deleteDraftAlbumSafely(protectedAlbum.id, owner.id)).rejects.toThrow("order history");
+    expect(await db.orderItem.findUnique({ where: { orderId_photoId: { orderId: order.id, photoId: protectedPhoto.id } } })).not.toBeNull();
   });
   it("runs the owner-only photo pipeline and keeps originals outside public storage", async () => {
     const directory=await fs.mkdtemp(path.join(os.tmpdir(),"sportpix-integration-")); const provider=new LocalStorageProvider(directory);

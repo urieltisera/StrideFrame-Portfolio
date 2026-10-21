@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   getOrCreateInternalLibraryEvent: vi.fn(),
   getOwnedUploadAlbum: vi.fn(),
   createDraftEvent: vi.fn(),
-  prisma: { album: { update: vi.fn() }, event: { findFirst: vi.fn() } },
+  prisma: { album: { findFirst: vi.fn(), update: vi.fn() }, event: { findFirst: vi.fn() } },
 }));
 
 vi.mock("@/lib/auth", () => ({ getCurrentPhotographer: mocks.getCurrentPhotographer }));
@@ -33,6 +33,8 @@ describe("photographer upload API contract", () => {
     vi.clearAllMocks();
     mocks.getCurrentPhotographer.mockResolvedValue({ id: "photographer-a" });
     mocks.getOrCreateInternalLibraryEvent.mockResolvedValue({ id: "event-a" });
+    mocks.prisma.album.findFirst.mockResolvedValue({ eventId: "event-a" });
+    mocks.prisma.event.findFirst.mockResolvedValue({ id: "event-a" });
     mocks.getOwnedUploadAlbum.mockResolvedValue({ id: "album-a", status: "DRAFT" });
     mocks.createPhoto.mockResolvedValue({ id: "photo-created" });
   });
@@ -45,6 +47,7 @@ describe("photographer upload API contract", () => {
   });
 
   it("rejects a foreign or non-owned album", async () => {
+    mocks.prisma.album.findFirst.mockResolvedValue(null);
     mocks.getOwnedUploadAlbum.mockResolvedValue(null);
     const response = await POST(request({ albumId: "album-foreign", priceDollars: "5.00" }, [new File(["a"], "a.jpg", { type: "image/jpeg" })]));
     expect(response.status).toBe(400);
@@ -79,5 +82,15 @@ describe("photographer upload API contract", () => {
     expect(mocks.createPhoto).toHaveBeenCalledTimes(2);
     expect(mocks.createPhoto).toHaveBeenCalledWith(expect.objectContaining({ photographerId: "photographer-a", albumId: "album-a" }));
     expect(mocks.prisma.album.update).toHaveBeenCalledWith({ where: { id: "album-a" }, data: { priceCents: 1250 } });
+  });
+
+  it("resolves a visible draft album through its own event", async () => {
+    mocks.prisma.album.findFirst.mockResolvedValue({ eventId: "visible-event" });
+    mocks.prisma.event.findFirst.mockResolvedValue({ id: "visible-event" });
+    mocks.getOwnedUploadAlbum.mockResolvedValue({ id: "visible-album", status: "DRAFT" });
+    const response = await POST(request({ albumId: "visible-album", priceDollars: "12.50" }, [new File(["a"], "a.jpg", { type: "image/jpeg" })]));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ eventId: "visible-event", albumId: "visible-album", uploaded: 1 });
+    expect(mocks.getOrCreateInternalLibraryEvent).not.toHaveBeenCalled();
   });
 });
