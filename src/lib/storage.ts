@@ -8,6 +8,7 @@ export interface StorageProvider {
   deleteOriginal(key: string): Promise<void>;
   deletePreview(key: string): Promise<void>;
   getProtectedOriginal(key: string): Promise<Buffer>;
+  getProtectedPreview?(key: string): Promise<Buffer>;
   createSignedOriginalDownload?(key: string, ttlSeconds: number): Promise<string>;
   getPublicPreviewUrl(key: string): string;
   putAsset(file: StoredFile): Promise<void>;
@@ -26,6 +27,7 @@ export class LocalStorageProvider implements StorageProvider {
   async deleteOriginal(key: string) { await fs.rm(this.file("originals", key), { force:true }); }
   async deletePreview(key: string) { await fs.rm(this.file("previews", key), { force:true }); }
   async getProtectedOriginal(key: string) { return fs.readFile(this.file("originals", key)); }
+  async getProtectedPreview(key: string) { return fs.readFile(this.file("previews", key)); }
   async putAsset(file: StoredFile) { return this.put("assets", file); }
   async deleteAsset(key: string) { await fs.rm(this.file("assets", key), { force: true }); }
   async getAsset(key: string) { return fs.readFile(this.file("assets", key)); }

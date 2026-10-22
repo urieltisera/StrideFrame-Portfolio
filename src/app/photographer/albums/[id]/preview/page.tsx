@@ -7,7 +7,6 @@ import { EmptyState } from "@/components/feedback";
 import { SafeImage } from "@/components/safe-image";
 import { getCurrentPhotographer } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { createStorageProvider } from "@/lib/storage-factory";
 import { albumDisplayTitle } from "@/lib/album-labels";
 
 export default async function DraftAlbumPreview({ params }: { params: Promise<{ id: string }> }) {
@@ -19,7 +18,6 @@ export default async function DraftAlbumPreview({ params }: { params: Promise<{ 
     include: { event: true, photos: { orderBy: { createdAt: "asc" } } },
   });
   if (!album) notFound();
-  const previewProvider = createStorageProvider();
 
   return <CustomerShell eventName={album.title} appearance={person.appearanceTheme}>
     <div className="mb-7 flex flex-wrap items-center justify-between gap-3">
@@ -33,6 +31,6 @@ export default async function DraftAlbumPreview({ params }: { params: Promise<{ 
         <Link href={`/photographer/albums/${album.id}`}><Button type="button" variant="secondary">Back to edit album</Button></Link>
       </div>
     </section>
-    {album.photos.length === 0 ? <div className="mt-8"><EmptyState title="No photos in this draft yet" description="Add photos from the album editor to see the customer-facing preview." action={<Link href={`/photographer/albums/${album.id}`}><Button type="button">Add photos</Button></Link>} /></div> : <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">{album.photos.map((photo) => <Card key={photo.id} className="overflow-hidden p-0"><div className="aspect-[4/3] bg-[var(--surface-elevated)]"><SafeImage src={previewProvider.getPublicPreviewUrl(photo.previewKey)} alt={photo.title || "Draft album photo preview"} fallbackLabel="Preview unavailable" className="h-full w-full object-cover" /></div><div className="p-4"><p className="truncate text-sm font-semibold" title={photo.originalFilename}>{photo.title || photo.originalFilename}</p><p className="sf-caption mt-2">Private until published</p></div></Card>)}</div>}
+    {album.photos.length === 0 ? <div className="mt-8"><EmptyState title="No photos in this draft yet" description="Add photos from the album editor to see the customer-facing preview." action={<Link href={`/photographer/albums/${album.id}`}><Button type="button">Add photos</Button></Link>} /></div> : <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">{album.photos.map((photo) => <Card key={photo.id} className="overflow-hidden p-0"><div className="aspect-[4/3] bg-[var(--surface-elevated)]"><SafeImage src={`/api/photographer/previews/${photo.previewKey}`} alt={photo.title || "Draft album photo preview"} fallbackLabel="Preview unavailable" className="h-full w-full object-cover" /></div><div className="p-4"><p className="truncate text-sm font-semibold" title={photo.originalFilename}>{photo.title || photo.originalFilename}</p><p className="sf-caption mt-2">Private until published</p></div></Card>)}</div>}
   </CustomerShell>;
 }
